@@ -1,0 +1,126 @@
+# Mutual Funds API
+
+A small self-hosted scraper + REST API for Pakistani mutual fund NAVs (net
+asset values), sourced from [MUFAP's](https://www.mufap.com.pk/) public Fund
+Directory. Run it yourself, point your frontend at it, done.
+
+## Why this exists
+
+MUFAP's own JSON endpoints (the ones their site's own JS calls) reject
+server-side requests even with browser-identical headers — they likely
+require some session/anti-forgery state that isn't practical to replicate
+outside a real browser. Their public Fund Directory page, on the other hand,
+is a plain server-rendered HTML table with every fund's current NAV already
+in the markup — no auth, no pagination, ~500+ funds in one response — so
+this scrapes that page instead of fighting the broken API.
+
+## Quickstart
+
+```bash
+git clone <this-repo>
+cd mutual-funds-api
+npm install
+cp .env.example .env
+npm run dev
+```
+
+The server starts on `http://localhost:4000` (configurable), scrapes MUFAP
+once immediately on startup, and serves whatever it has at `GET /api/funds`.
+
+## How it works
+
+- **Scraper** (`src/scraper.ts`) fetches and parses MUFAP's Fund Directory
+  page with [cheerio](https://cheerio.js.org/).
+- **Storage** (`src/store.ts`) writes the result to a local JSON file
+  (`./data/funds.json` by default) — no database required.
+- **Scheduler** (`src/scheduler.ts`) re-scrapes on a configurable interval.
+  MUFAP only publishes updated NAVs once per business day, so scraping more
+  often than that just makes extra requests against their site for no new
+  data — the default (`FETCH_TIMES_PER_DAY=1`) reflects that.
+- **API** (`src/server.ts`) is a minimal Express server exposing the current
+  cached data, with CORS wide open so you can call it directly from
+  frontend JS.
+
+## Configuration
+
+All via environment variables (see `.env.example`):
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` | `4000` | Port the API server listens on |
+| `FETCH_TIMES_PER_DAY` | `1` | How often the built-in scheduler re-scrapes. Set to `0` to disable it entirely (see below) |
+| `SKIP_WEEKENDS` | `true` | Skip scheduled fetches on Sat/Sun — MUFAP doesn't publish new NAVs on weekends |
+| `DATA_FILE` | `./data/funds.json` | Where scraped data is stored on disk |
+
+## Running it your way
+
+Two ways to keep the data fresh, pick whichever fits your setup:
+
+1. **Built-in scheduler** (default) — `npm start` runs the API server and
+   an in-process scheduler together. Simplest option if you're running this
+   as a long-lived process (a VM, a container, etc.).
+2. **Your own cron** — set `FETCH_TIMES_PER_DAY=0` to disable the built-in
+   scheduler, and instead run `npm run scrape` on whatever schedule you
+   want (system cron, GitHub Actions, Vercel Cron, a serverless scheduled
+   function...). Useful if you're deploying the API server somewhere
+   serverless/ephemeral where a long-running `setInterval` doesn't make
+   sense — trigger the scrape externally, the API just serves whatever's
+   on disk.
+
+## API reference
+
+### `GET /api/funds`
+
+Returns every fund currently cached.
+
+```bash
+curl http://localhost:4000/api/funds
+```
+
+```json
+{
+  "funds": [
+    {
+      "fundId": "12768",
+      "name": "ABL Cash Fund",
+      "amc": "ABL Asset Management Company Limited",
+      "nav": 10.32,
+      "offerPrice": 10.41,
+      "category": "Money Market"
+    }
+  ],
+  "updatedAt": "2026-07-17T21:22:35.027Z"
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `fundId` | `string` | MUFAP's internal fund ID (falls back to the fund name if MUFAP's markup doesn't expose one) |
+| `name` | `string` | Fund name |
+| `amc` | `string` | Asset Management Company that runs the fund |
+| `nav` | `number` | Current net asset value per unit (PKR) |
+| `offerPrice` | `number` | Current offer price per unit (PKR) |
+| `category` | `string` | Fund category, e.g. "Money Market", "Equity" |
+| `updatedAt` | `string` | ISO 8601 timestamp of the last successful scrape |
+
+If nothing has been scraped yet (fresh install, no prior `npm run scrape`),
+this endpoint scrapes once inline on the first request rather than
+returning empty, so it's never dead in the water — every request after that
+serves the cached copy.
+
+### `GET /health`
+
+Plain liveness check — `{"ok": true}`.
+
+## Data source & disclaimer
+
+Data is scraped from MUFAP's public Fund Directory, refreshed on whatever
+schedule you configure. This project is not affiliated with or endorsed by
+MUFAP. NAVs and offer prices are provided as-is, for informational use —
+verify against MUFAP directly before making any financial decision based on
+this data. If MUFAP changes their page markup, the scraper's parsing logic
+(`src/scraper.ts`) will need updating.
+
+## License
+
+MIT
