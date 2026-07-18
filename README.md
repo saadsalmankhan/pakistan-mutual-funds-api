@@ -121,6 +121,11 @@ verify against MUFAP directly before making any financial decision based on
 this data. If MUFAP changes their page markup, the scraper's parsing logic
 (`src/scraper.ts`) will need updating.
 
+## Author
+
+Built by [Saad Salman](https://saadsalman.org). If you found this useful,
+[subscribe to my blog](https://saadsalman.org) for more.
+
 ## License
 
 MIT
