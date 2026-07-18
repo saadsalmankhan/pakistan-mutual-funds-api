@@ -1,4 +1,4 @@
-# Mutual Funds API
+# Pakistan Mutual Funds API
 
 A small self-hosted scraper + REST API for Pakistani mutual fund NAVs (net
 asset values), sourced from [MUFAP's](https://www.mufap.com.pk/) public Fund
@@ -17,8 +17,8 @@ this scrapes that page instead of fighting the broken API.
 ## Quickstart
 
 ```bash
-git clone <this-repo>
-cd mutual-funds-api
+git clone https://github.com/saadsalmankhan/pakistan-mutual-funds-api.git
+cd pakistan-mutual-funds-api
 npm install
 cp .env.example .env
 npm run dev

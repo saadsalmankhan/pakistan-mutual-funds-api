@@ -1,5 +1,5 @@
 {
-  "name": "mutual-funds-api",
+  "name": "pakistan-mutual-funds-api",
   "version": "1.0.0",
   "description": "A self-hosted scraper + REST API for Pakistani mutual fund NAVs, sourced from MUFAP's public Fund Directory.",
   "license": "MIT",
