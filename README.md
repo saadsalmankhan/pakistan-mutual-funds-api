@@ -31,6 +31,13 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
 
 - **Scraper** (`src/scraper.ts`) fetches and parses MUFAP's Fund Directory
   page with [cheerio](https://cheerio.js.org/).
+- **Cloudflare handling** — MUFAP sits behind Cloudflare's bot protection, so
+  a plain request gets a `403`. The scraper uses
+  [got-scraping](https://github.com/apify/got-scraping) to fetch the page with
+  a real browser's TLS fingerprint, which Cloudflare serves the real page to.
+  This is automatic: no clearance cookies, no headless browser and no config,
+  so a fresh clone works out of the box. Cloudflare still challenges the odd
+  request, so the fetch retries a few times before giving up.
 - **Storage** (`src/store.ts`) writes the result to a local JSON file
   (`./data/funds.json` by default) — no database required.
 - **Scheduler** (`src/scheduler.ts`) re-scrapes on a configurable interval.
@@ -51,6 +58,8 @@ All via environment variables (see `.env.example`):
 | `FETCH_TIMES_PER_DAY` | `1` | How often the built-in scheduler re-scrapes. Set to `0` to disable it entirely (see below) |
 | `SKIP_WEEKENDS` | `true` | Skip scheduled fetches on Sat/Sun — MUFAP doesn't publish new NAVs on weekends |
 | `DATA_FILE` | `./data/funds.json` | Where scraped data is stored on disk |
+| `SCRAPE_ATTEMPTS` | `4` | How many times to retry the MUFAP fetch past an occasional Cloudflare challenge |
+| `SCRAPE_TIMEOUT_MS` | `45000` | Per-request timeout for the MUFAP fetch, in milliseconds |
 
 ## Running it your way
 
