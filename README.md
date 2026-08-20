@@ -117,6 +117,20 @@ this endpoint scrapes once inline on the first request rather than
 returning empty, so it's never dead in the water — every request after that
 serves the cached copy.
 
+**Freshness headers.** Alongside the body's `updatedAt`, the response carries
+the last scrape time in two headers so consumers can check freshness without
+parsing the payload:
+
+| Header | Example | Notes |
+|---|---|---|
+| `Last-Modified` | `Thu, 20 Aug 2026 13:43:36 GMT` | Standard, second-resolution. Send it back as `If-Modified-Since` and you get a `304 Not Modified` (empty body) when the data hasn't changed, so you can poll cheaply |
+| `X-Data-Updated-At` | `2026-08-20T13:43:36.905Z` | Full-precision ISO 8601, same value as the body's `updatedAt` |
+
+Both are CORS-exposed, so frontend JS can read them directly. Note this is
+*when your instance last scraped*, not a date published by MUFAP — MUFAP
+doesn't expose a NAV date on the Fund Directory page. The scheduler skips
+weekends, when MUFAP doesn't publish new NAVs.
+
 ### `GET /health`
 
 Plain liveness check — `{"ok": true}`.
