@@ -144,7 +144,7 @@ curl http://localhost:4000/api/funds
 | `shariah` | `boolean` | Whether the fund is Shariah-compliant (derived from MUFAP's category) |
 | `benchmark` | `string \| null` | `"KSE-100"` for conventional equity categories, `"KMI-30"` for Shariah equity categories, `null` for everything else (mixed-mandate and fixed-income funds have no single honest index) |
 | `inceptionDate` | `string?` | Fund inception date as MUFAP prints it (needs `npm run enrich`) |
-| `expenseRatio` | `number?` | Total Expense Ratio, YTD % (needs `npm run enrich`) |
+| `expenseRatio` | `number?` | Total Expense Ratio, YTD % — fiscal year-to-date (Pakistani fiscal year starts July 1), so values reset each July and look small or erratic early in the fiscal year (needs `npm run enrich`) |
 | `managementFee` | `number?` | Management fee % (needs `npm run enrich`) |
 | `updatedAt` | `string` | ISO 8601 timestamp of the last successful scrape |
 

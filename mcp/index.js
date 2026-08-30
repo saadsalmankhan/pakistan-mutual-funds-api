@@ -137,7 +137,9 @@ server.registerTool('list_funds', {
 })
 
 server.registerTool('get_fund', {
-  description: 'Full record for one fund by its MUFAP fundId: NAV, offer price, category, Shariah status, benchmark, expense ratio, management fee, inception date.',
+  description:
+    'Full record for one fund by its MUFAP fundId: NAV, offer price, category, Shariah status, benchmark, expense ratio, management fee, inception date. ' +
+    'Note: expenseRatio is TER fiscal-year-to-date (Pakistani fiscal year starts July 1), so it resets each July.',
   inputSchema: { fundId: z.string().describe('MUFAP fund id, e.g. "12768" (from list_funds)') },
 }, async ({ fundId }) => {
   const { funds, updatedAt } = await getFunds()
