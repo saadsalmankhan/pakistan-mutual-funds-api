@@ -40,6 +40,12 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
   request, so the fetch retries a few times before giving up.
 - **Storage** (`src/store.ts`) writes the result to a local JSON file
   (`./data/funds.json` by default) — no database required.
+- **History** — every successful scrape also appends each fund's NAV to a
+  per-fund NDJSON file under `./data/history/`, one entry per day, so an
+  instance accumulates a NAV time series from the day it starts running.
+  MUFAP doesn't publish a NAV date on the directory page, so entries are
+  keyed by the scrape date in MUFAP's timezone (Asia/Karachi); a re-scrape
+  on the same date replaces that day's entry if MUFAP corrected the values.
 - **Scheduler** (`src/scheduler.ts`) re-scrapes on a configurable interval.
   MUFAP only publishes updated NAVs once per business day, so scraping more
   often than that just makes extra requests against their site for no new
@@ -58,6 +64,7 @@ All via environment variables (see `.env.example`):
 | `FETCH_TIMES_PER_DAY` | `1` | How often the built-in scheduler re-scrapes. Set to `0` to disable it entirely (see below) |
 | `SKIP_WEEKENDS` | `true` | Skip scheduled fetches on Sat/Sun — MUFAP doesn't publish new NAVs on weekends |
 | `DATA_FILE` | `./data/funds.json` | Where scraped data is stored on disk |
+| `HISTORY_DIR` | `./data/history` | Where per-fund NAV history (NDJSON) accumulates |
 | `SCRAPE_ATTEMPTS` | `4` | How many times to retry the MUFAP fetch past an occasional Cloudflare challenge |
 | `SCRAPE_TIMEOUT_MS` | `45000` | Per-request timeout for the MUFAP fetch, in milliseconds |
 
@@ -80,7 +87,13 @@ Two ways to keep the data fresh, pick whichever fits your setup:
 
 ### `GET /api/funds`
 
-Returns every fund currently cached.
+Returns every fund currently cached. Optional filters, all case-insensitive:
+
+| Param | Matches |
+|---|---|
+| `category` | Fund category, exact (`?category=money%20market`) |
+| `amc` | Asset Management Company, exact |
+| `q` | Substring of the fund name (`?q=abl%20cash`) |
 
 ```bash
 curl http://localhost:4000/api/funds
@@ -130,6 +143,45 @@ Both are CORS-exposed, so frontend JS can read them directly. Note this is
 *when your instance last scraped*, not a date published by MUFAP — MUFAP
 doesn't expose a NAV date on the Fund Directory page. The scheduler skips
 weekends, when MUFAP doesn't publish new NAVs.
+
+### `GET /api/funds/:id`
+
+One fund by its MUFAP `fundId`. `404` for unknown ids.
+
+```bash
+curl http://localhost:4000/api/funds/12768
+```
+
+### `GET /api/funds/:id/history`
+
+The fund's accumulated NAV history, oldest first, with optional `from`/`to`
+date bounds (inclusive, `YYYY-MM-DD`):
+
+```bash
+curl "http://localhost:4000/api/funds/12768/history?from=2026-08-01"
+```
+
+```json
+{
+  "fundId": "12768",
+  "history": [
+    { "date": "2026-08-30", "nav": 10.41, "offerPrice": 10.51 }
+  ]
+}
+```
+
+History accumulates from the day an instance first runs (one entry per
+business day). Dates are scrape dates in Asia/Karachi — MUFAP doesn't expose
+an official NAV date on the directory page.
+
+### `GET /api/categories` and `GET /api/amcs`
+
+Distinct fund categories / AMC names currently in the dataset, sorted —
+handy for dropdowns and agent tool calls:
+
+```bash
+curl http://localhost:4000/api/categories
+```
 
 ### `GET /health`
 
