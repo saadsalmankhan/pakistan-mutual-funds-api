@@ -4,6 +4,12 @@ A small self-hosted scraper + REST API for Pakistani mutual fund NAVs (net
 asset values), sourced from [MUFAP's](https://www.mufap.com.pk/) public Fund
 Directory. Run it yourself, point your frontend at it, done.
 
+Don't want to run anything? This scraper also feeds
+[pakistan-mutual-funds-data](https://github.com/saadsalmankhan/pakistan-mutual-funds-data),
+a free public dataset where a GitHub Action commits the daily snapshot,
+growing NAV history and fund metadata every business day — just fetch the
+raw files.
+
 ## Why this exists
 
 MUFAP's own JSON endpoints (the ones their site's own JS calls) reject
