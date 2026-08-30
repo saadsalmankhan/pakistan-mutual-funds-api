@@ -25,6 +25,17 @@ async function fetchJson(url) {
 async function getFunds() {
   if (fundsCache && Date.now() - fundsCacheAt < CACHE_MS) return fundsCache
   const data = API ? await fetchJson(`${API}/api/funds`) : await fetchJson(`${RAW}/funds.json`)
+  // Defense in depth for dataset mode: if the committed snapshot predates a
+  // successful enrich run, merge meta.json (TER, management fee, inception)
+  // ourselves so agents always see expense ratios when they exist.
+  if (!API && data.funds?.length && data.funds.every(f => f.expenseRatio === undefined)) {
+    try {
+      const meta = await fetchJson(`${RAW}/meta.json`)
+      data.funds = data.funds.map(f => (meta[f.fundId] ? { ...f, ...meta[f.fundId] } : f))
+    } catch {
+      // meta.json missing entirely — serve the snapshot as-is
+    }
+  }
   fundsCache = data
   fundsCacheAt = Date.now()
   return data
