@@ -2,6 +2,7 @@ import express from 'express'
 import type { Request, Response } from 'express'
 import { readStore, writeStore, readHistory } from './store.js'
 import { scrapeMufapFundDirectory } from './scraper.js'
+import { computeReturns } from './returns.js'
 import type { FundStore } from './types.js'
 
 const PORT = Number(process.env.PORT || 4000)
@@ -98,6 +99,25 @@ export function createServer() {
     } catch (err) {
       console.error('Failed to serve fund history:', err)
       res.status(500).json({ error: 'Failed to read fund history' })
+    }
+  })
+
+  app.get('/api/funds/:id/returns', async (req, res) => {
+    try {
+      const history = await readHistory(req.params.id)
+      const result = history === null ? null : computeReturns(history)
+      if (!result) {
+        res.status(404).json({ error: 'No history for this fund id (yet)' })
+        return
+      }
+      res.json({
+        fundId: req.params.id,
+        ...result,
+        note: 'Simple NAV percentage change, not annualized; payouts and dividends are not accounted for. A period is null until tracked history reaches back far enough.',
+      })
+    } catch (err) {
+      console.error('Failed to serve fund returns:', err)
+      res.status(500).json({ error: 'Failed to compute fund returns' })
     }
   })
 

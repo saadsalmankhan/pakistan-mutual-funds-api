@@ -197,6 +197,32 @@ History accumulates from the day an instance first runs (one entry per
 business day). Dates are scrape dates in Asia/Karachi — MUFAP doesn't expose
 an official NAV date on the directory page.
 
+### `GET /api/funds/:id/returns`
+
+Trailing returns computed from the fund's accumulated history:
+
+```json
+{
+  "fundId": "12768",
+  "latestDate": "2026-08-30",
+  "latestNav": 10.44,
+  "returns": {
+    "1m": { "pct": 2.68, "fromDate": "2026-07-30", "fromNav": 10.17 },
+    "3m": null,
+    "ytd": null,
+    "1y": null,
+    "sinceTracking": { "pct": 4.92, "fromDate": "2026-08-30", "fromNav": 9.95 }
+  }
+}
+```
+
+The formula is deliberately boring: simple NAV percentage change against the
+most recent NAV on or before each period boundary, rounded to two decimals.
+Not annualized, and payouts/dividends are not accounted for (this is NAV-only
+data), so income-distributing funds will understate. A period is `null` until
+the tracked history reaches back far enough — `sinceTracking` is always
+available once a fund has two days of history.
+
 ### `GET /api/categories` and `GET /api/amcs`
 
 Distinct fund categories / AMC names currently in the dataset, sorted —
