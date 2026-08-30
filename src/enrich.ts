@@ -24,6 +24,7 @@ function parsePercent(text: string): number | undefined {
 async function fetchExpenseRatiosHtml(): Promise<string> {
   let lastError: unknown
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) await new Promise(r => setTimeout(r, attempt * 5000))
     try {
       const res = await gotScraping({
         url: EXPENSE_RATIOS_URL,

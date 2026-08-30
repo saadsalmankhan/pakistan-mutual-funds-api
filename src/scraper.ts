@@ -51,6 +51,10 @@ function inferBenchmark(category: string, shariah: boolean): string | null {
 async function fetchFundDirectoryHtml(): Promise<string> {
   let lastError: unknown
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Back off between attempts — Cloudflare challenges resolve far more
+    // often with a pause than with an immediate hammer from the same IP
+    // (GitHub Actions runners especially).
+    if (attempt > 1) await new Promise(r => setTimeout(r, attempt * 5000))
     try {
       const res = await gotScraping({
         url: FUND_DIRECTORY_URL,
