@@ -253,3 +253,16 @@ Built by [Saad Salman](https://saadsalman.org). If you found this useful,
 ## License
 
 MIT
+
+## MCP server (for AI agents)
+
+The [`mcp/`](mcp/) package exposes this data to any MCP client — Claude,
+Cursor, or your own agents — as five tools (`list_funds`, `get_fund`,
+`get_nav_history`, `get_returns`, `get_filters`). Zero setup: it reads the
+public dataset by default, or set `API_BASE_URL` to use your own instance.
+
+```bash
+claude mcp add pakistan-mutual-funds -- npx -y pakistan-mutual-funds-mcp
+```
+
+An OpenAPI 3.1 spec for the REST API is served at `GET /openapi.json`.

@@ -1,0 +1,36 @@
+{
+  "name": "pakistan-mutual-funds-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Pakistani mutual fund NAVs, history, and returns — zero-setup, reads the free public MUFAP-sourced dataset.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "pakistan-mutual-funds-mcp": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "pakistan",
+    "mutual-funds",
+    "nav",
+    "mufap",
+    "fintech"
+  ],
+  "author": "Saad Salman (https://saadsalman.org)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saadsalmankhan/pakistan-mutual-funds-api.git",
+    "directory": "mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  }
+}

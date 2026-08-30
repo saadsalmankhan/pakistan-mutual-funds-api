@@ -47,8 +47,12 @@ function karachiDate(): string {
 
 // fundId normally comes from MUFAP's FundID query param, but falls back to the
 // fund name when the markup doesn't expose one — keep filenames safe either way.
-function historyFile(fundId: string): string {
+export function historyFile(fundId: string): string {
   return join(HISTORY_DIR, `${fundId.replace(/[^\w.-]/g, '_').slice(0, 120)}.ndjson`)
+}
+
+export function historyDir(): string {
+  return HISTORY_DIR
 }
 
 // Append today's NAV to each fund's history file. One entry per Karachi date:

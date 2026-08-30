@@ -3,6 +3,7 @@ import type { Request, Response } from 'express'
 import { readStore, writeStore, readHistory } from './store.js'
 import { scrapeMufapFundDirectory } from './scraper.js'
 import { computeReturns } from './returns.js'
+import { openapi } from './openapi.js'
 import type { FundStore } from './types.js'
 
 const PORT = Number(process.env.PORT || 4000)
@@ -46,6 +47,10 @@ export function createServer() {
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true })
+  })
+
+  app.get('/openapi.json', (_req, res) => {
+    res.json(openapi)
   })
 
   app.get('/api/funds', async (req, res) => {
