@@ -1,9 +1,10 @@
 import { appendFile, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { Fund, FundStore, HistoryEntry } from './types.js'
+import type { Fund, FundStore, HistoryEntry, MetaFile } from './types.js'
 
 const DATA_FILE = process.env.DATA_FILE || './data/funds.json'
 const HISTORY_DIR = process.env.HISTORY_DIR || './data/history'
+const META_FILE = process.env.META_FILE || './data/meta.json'
 
 export async function readStore(): Promise<FundStore | null> {
   try {
@@ -16,11 +17,26 @@ export async function readStore(): Promise<FundStore | null> {
 }
 
 export async function writeStore(funds: Fund[]): Promise<FundStore> {
-  const store: FundStore = { funds, updatedAt: new Date().toISOString() }
+  const enriched = await applyMeta(funds)
+  const store: FundStore = { funds: enriched, updatedAt: new Date().toISOString() }
   await mkdir(dirname(DATA_FILE), { recursive: true })
   await writeFile(DATA_FILE, JSON.stringify(store, null, 2), 'utf-8')
-  await appendHistory(funds)
+  await appendHistory(enriched)
   return store
+}
+
+// Merge per-fund metadata (expense ratio, management fee, inception date)
+// scraped separately by `npm run enrich`. Missing file just means no
+// enrichment yet — the snapshot works fine without it.
+async function applyMeta(funds: Fund[]): Promise<Fund[]> {
+  let meta: MetaFile
+  try {
+    meta = JSON.parse(await readFile(META_FILE, 'utf-8')) as MetaFile
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return funds
+    throw err
+  }
+  return funds.map(f => (meta[f.fundId] ? { ...f, ...meta[f.fundId] } : f))
 }
 
 // MUFAP doesn't publish a NAV date on the directory page, so history entries

@@ -69,10 +69,14 @@ export function createServer() {
       const category = queryParam(req, 'category')?.toLowerCase()
       const amc = queryParam(req, 'amc')?.toLowerCase()
       const q = queryParam(req, 'q')?.toLowerCase()
+      const shariah = queryParam(req, 'shariah')?.toLowerCase()
       let funds = store.funds
       if (category) funds = funds.filter(f => f.category.toLowerCase() === category)
       if (amc) funds = funds.filter(f => f.amc.toLowerCase() === amc)
       if (q) funds = funds.filter(f => f.name.toLowerCase().includes(q))
+      if (shariah === 'true' || shariah === 'false') {
+        funds = funds.filter(f => f.shariah === (shariah === 'true'))
+      }
 
       res.json({ funds, updatedAt: store.updatedAt })
     } catch (err) {

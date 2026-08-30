@@ -53,6 +53,11 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
 - **API** (`src/server.ts`) is a minimal Express server exposing the current
   cached data, with CORS wide open so you can call it directly from
   frontend JS.
+- **Enrichment** (`src/enrich.ts`, `npm run enrich`) scrapes MUFAP's
+  server-rendered Expense Ratios table (Industry Statistics) and stores
+  per-fund TER, management fee and inception date in `data/meta.json`;
+  every subsequent snapshot merges it in by `fundId`. Expense ratios change
+  rarely, so running it daily is fine but weekly is plenty.
 
 ## Configuration
 
@@ -65,6 +70,7 @@ All via environment variables (see `.env.example`):
 | `SKIP_WEEKENDS` | `true` | Skip scheduled fetches on Sat/Sun — MUFAP doesn't publish new NAVs on weekends |
 | `DATA_FILE` | `./data/funds.json` | Where scraped data is stored on disk |
 | `HISTORY_DIR` | `./data/history` | Where per-fund NAV history (NDJSON) accumulates |
+| `META_FILE` | `./data/meta.json` | Where `npm run enrich` stores expense ratios and inception dates |
 | `SCRAPE_ATTEMPTS` | `4` | How many times to retry the MUFAP fetch past an occasional Cloudflare challenge |
 | `SCRAPE_TIMEOUT_MS` | `45000` | Per-request timeout for the MUFAP fetch, in milliseconds |
 
@@ -94,6 +100,7 @@ Returns every fund currently cached. Optional filters, all case-insensitive:
 | `category` | Fund category, exact (`?category=money%20market`) |
 | `amc` | Asset Management Company, exact |
 | `q` | Substring of the fund name (`?q=abl%20cash`) |
+| `shariah` | `true` or `false` — Shariah-compliant funds only, or conventional only |
 
 ```bash
 curl http://localhost:4000/api/funds
@@ -108,7 +115,12 @@ curl http://localhost:4000/api/funds
       "amc": "ABL Asset Management Company Limited",
       "nav": 10.32,
       "offerPrice": 10.41,
-      "category": "Money Market"
+      "category": "Money Market",
+      "shariah": false,
+      "benchmark": null,
+      "inceptionDate": "Jul 31, 2010",
+      "expenseRatio": 1.15,
+      "managementFee": 0.7
     }
   ],
   "updatedAt": "2026-07-17T21:22:35.027Z"
@@ -123,6 +135,11 @@ curl http://localhost:4000/api/funds
 | `nav` | `number` | Current net asset value per unit (PKR) |
 | `offerPrice` | `number` | Current offer price per unit (PKR) |
 | `category` | `string` | Fund category, e.g. "Money Market", "Equity" |
+| `shariah` | `boolean` | Whether the fund is Shariah-compliant (derived from MUFAP's category) |
+| `benchmark` | `string \| null` | `"KSE-100"` for conventional equity categories, `"KMI-30"` for Shariah equity categories, `null` for everything else (mixed-mandate and fixed-income funds have no single honest index) |
+| `inceptionDate` | `string?` | Fund inception date as MUFAP prints it (needs `npm run enrich`) |
+| `expenseRatio` | `number?` | Total Expense Ratio, YTD % (needs `npm run enrich`) |
+| `managementFee` | `number?` | Management fee % (needs `npm run enrich`) |
 | `updatedAt` | `string` | ISO 8601 timestamp of the last successful scrape |
 
 If nothing has been scraped yet (fresh install, no prior `npm run scrape`),

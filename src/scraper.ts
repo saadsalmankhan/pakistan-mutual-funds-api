@@ -26,6 +26,25 @@ function parseNumber(text: string): number {
   return isNaN(n) ? 0 : n
 }
 
+// MUFAP encodes Shariah status directly in the category name ("Shariah
+// Compliant Equity", "VPS-Shariah Compliant Debt", ...).
+function isShariah(category: string): boolean {
+  return category.includes('Shariah Compliant')
+}
+
+// Benchmark mapping for equity-bearing categories only: conventional equity
+// tracks KSE-100, Shariah equity tracks KMI-30. Mixed-mandate categories
+// (Balanced, Asset Allocation) and fixed-income/money-market funds get null —
+// no single index honestly describes them.
+const EQUITY_CATEGORIES = new Set([
+  'Equity', 'Dedicated Equity', 'Index Tracker', 'Exchange Traded Fund', 'VPS-Equity',
+])
+function inferBenchmark(category: string, shariah: boolean): string | null {
+  const base = category.replace('Shariah Compliant ', '').replace('VPS-Shariah Compliant ', 'VPS-')
+  if (!EQUITY_CATEGORIES.has(base)) return null
+  return shariah ? 'KMI-30' : 'KSE-100'
+}
+
 // Fetch the directory HTML, retrying past the occasional Cloudflare challenge.
 // Only markup that actually contains fund rows counts as a success; a 200 that
 // is really a "Just a moment…" challenge page is treated as a miss and retried.
@@ -72,7 +91,9 @@ export async function scrapeMufapFundDirectory(): Promise<Fund[]> {
     const fundId = detailHref.split('FundID=')[1] ?? name
 
     if (nav > 0) {
-      funds.push({ fundId, name, amc, nav, offerPrice, category })
+      const shariah = isShariah(category)
+      const benchmark = inferBenchmark(category, shariah)
+      funds.push({ fundId, name, amc, nav, offerPrice, category, shariah, benchmark })
     }
   })
 
