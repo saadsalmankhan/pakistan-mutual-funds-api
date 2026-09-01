@@ -8,13 +8,33 @@ Zero setup: by default it reads the free public
 [pakistan-mutual-funds-data](https://github.com/saadsalmankhan/pakistan-mutual-funds-data)
 dataset. No API key, no server to run.
 
-## Use with Claude
+## What you can ask
+
+- What is the latest NAV for [fund name]?
+- Show me the 1 year return on [fund].
+- List all money market funds, or all Shariah compliant funds.
+- Which AMCs have an income fund, and how do their returns compare?
+
+## Requirements
+
+Node.js 18 or newer (that gives you `npx`). Check with `node -v`. Sanity-check the server with
+`npx -y pakistan-mutual-funds-mcp`, it should start and wait quietly (Ctrl+C to exit).
+
+## Use with Claude Code
 
 ```bash
 claude mcp add pakistan-mutual-funds -- npx -y pakistan-mutual-funds-mcp
 ```
 
-Or in any MCP client config:
+Add `-s user` to make it available across all your projects. Start a session and the fund tools
+are there.
+
+## Use with Claude Desktop
+
+Add the server to your config, then fully quit and reopen the app:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -26,6 +46,15 @@ Or in any MCP client config:
   }
 }
 ```
+
+The same block works in any other MCP client that launches stdio servers.
+
+## Use with ChatGPT
+
+This server runs locally over stdio, and ChatGPT's custom connectors only load remote MCP servers
+reachable at a public URL, so it cannot launch the local `npx` command the way Claude does. To use
+it in ChatGPT you would first host it as a remote (HTTP transport) endpoint, then add that URL under
+Settings, Connectors, Developer mode. Until a hosted URL exists, use Claude above.
 
 ## Tools
 
@@ -62,5 +91,13 @@ instance? Point the server at it:
   dividends not accounted for.
 - Informational use only, not financial advice. Verify against MUFAP before
   making decisions. Not affiliated with MUFAP.
+
+## Troubleshooting
+
+- **`command not found: npx`** install Node.js 18+.
+- **Tools do not appear in Claude Desktop** fully quit and relaunch (not just close the window),
+  and check the JSON is valid, a stray comma breaks it.
+- **First call is slow** the first `npx` run fetches the package, quick after that.
+- **Nothing returns for a fund** try a shorter name substring, matching is loose.
 
 Built by [Saad Salman](https://saadsalman.org). MIT.
