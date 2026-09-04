@@ -39,9 +39,13 @@ async function applyMeta(funds: Fund[]): Promise<Fund[]> {
   return funds.map(f => (meta[f.fundId] ? { ...f, ...meta[f.fundId] } : f))
 }
 
-// MUFAP doesn't publish a NAV date on the directory page, so history entries
-// are keyed by the scrape date in MUFAP's own timezone (Asia/Karachi, no DST).
-function karachiDate(): string {
+// MUFAP doesn't publish a NAV date on the directory page, so live appends key
+// history entries by the scrape date in MUFAP's own timezone (Asia/Karachi,
+// no DST). A run that drifts past midnight PKT files yesterday's NAV under
+// today's date — schedulers that can't guarantee start times (GitHub Actions
+// delays cron by hours) should set SKIP_HISTORY=true and merge dated rows via
+// `npm run backfill -- --recent=10 --overwrite` instead.
+export function karachiDate(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date())
 }
 
@@ -59,6 +63,7 @@ export function historyDir(): string {
 // a re-scrape on the same date replaces that day's entry if the values moved
 // (MUFAP corrections), and is a no-op otherwise.
 async function appendHistory(funds: Fund[]): Promise<void> {
+  if (process.env.SKIP_HISTORY === 'true') return
   await mkdir(HISTORY_DIR, { recursive: true })
   const today = karachiDate()
   for (const fund of funds) {

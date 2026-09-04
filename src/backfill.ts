@@ -2,22 +2,28 @@
 // (Industry/IndustryStatDaily?tab=3), which serves any date range as
 // server-rendered HTML with one row per fund per business day.
 //
-//   npm run backfill                          # from 2022-01-01 to yesterday
-//   npm run backfill -- --from=2019-01-01     # go deeper
+//   npm run backfill                              # from 2022-01-01 to yesterday
+//   npm run backfill -- --from=2019-01-01         # go deeper
+//   npm run backfill -- --recent=10 --overwrite   # re-merge the trailing days
 //
 // Fetches one calendar week per request (polite: ~3s between requests, retry
 // with backoff past Cloudflare), validates every row's validity date against
 // the requested range (MUFAP silently serves CURRENT data for out-of-range
 // requests, so unvalidated rows would corrupt history), and merges entries
 // into the per-fund NDJSON files date-sorted. Existing entries win on
-// conflict. Progress lives in data/backfill-state.json, so an interrupted run
-// resumes where it left off — re-running is always safe.
+// conflict unless --overwrite, which lets fresh MUFAP rows replace same-date
+// entries — the dataset workflow runs `--recent=N --overwrite` after every
+// snapshot so history carries MUFAP's own validity dates (immune to however
+// late GitHub starts the job) and picks up MUFAP's corrections. Progress
+// lives in data/backfill-state.json, so an interrupted run resumes where it
+// left off — re-running is always safe. --recent skips that state entirely:
+// its whole point is re-fetching the same window every day.
 import 'dotenv/config'
 import * as cheerio from 'cheerio'
 import { gotScraping } from 'got-scraping'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { historyFile, historyDir } from './store.js'
+import { historyFile, historyDir, karachiDate } from './store.js'
 import type { HistoryEntry } from './types.js'
 
 const STATE_FILE = process.env.BACKFILL_STATE_FILE || './data/backfill-state.json'
@@ -108,9 +114,11 @@ function parseChunk(html: string, from: string, to: string): Map<string, History
   return byFund
 }
 
-// Merge new entries into a fund's NDJSON file: existing dates win, result
-// stays date-sorted.
-async function mergeFund(fundId: string, entries: HistoryEntry[]): Promise<number> {
+// Merge new entries into a fund's NDJSON file, result date-sorted. Existing
+// dates win by default; with overwrite, MUFAP's row replaces a same-date
+// entry whose values differ (fixing mis-dated or corrected rows in-window —
+// parseChunk's range guard means only requested dates ever get here).
+async function mergeFund(fundId: string, entries: HistoryEntry[], overwrite: boolean): Promise<number> {
   const file = historyFile(fundId)
   const existing = new Map<string, HistoryEntry>()
   try {
@@ -122,17 +130,19 @@ async function mergeFund(fundId: string, entries: HistoryEntry[]): Promise<numbe
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
-  let added = 0
+  let changed = 0
   for (const e of entries) {
-    if (!existing.has(e.date)) {
+    const prev = existing.get(e.date)
+    const replace = prev && overwrite && (prev.nav !== e.nav || prev.offerPrice !== e.offerPrice)
+    if (!prev || replace) {
       existing.set(e.date, e)
-      added++
+      changed++
     }
   }
-  if (!added) return 0
+  if (!changed) return 0
   const sorted = [...existing.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
   await writeFile(file, sorted.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf-8')
-  return added
+  return changed
 }
 
 async function loadState(): Promise<Record<string, boolean>> {
@@ -154,30 +164,42 @@ function arg(name: string, fallback: string): string {
   return hit ? hit.split('=')[1] : fallback
 }
 
+function hasFlag(name: string): boolean {
+  return process.argv.includes(`--${name}`)
+}
+
 async function main() {
-  const from = arg('from', '2022-01-01')
-  const to = arg('to', isoShift(new Date().toISOString().slice(0, 10), -1))
+  const recentDays = Math.floor(Number(arg('recent', '0')))
+  const overwrite = hasFlag('overwrite')
+  // --recent windows end at today in Karachi so an evening run catches the
+  // NAVs MUFAP published a few hours earlier; the range guard drops today's
+  // dates when they aren't out yet.
+  const from = recentDays > 0 ? isoShift(karachiDate(), -recentDays) : arg('from', '2022-01-01')
+  const to = recentDays > 0 ? karachiDate() : arg('to', isoShift(new Date().toISOString().slice(0, 10), -1))
   await mkdir(historyDir(), { recursive: true })
-  const state = await loadState()
+  const state = recentDays > 0 ? {} : await loadState()
   const chunks = weekChunks(from, to)
   const pending = chunks.filter(c => !state[`${c.from}_${c.to}`])
-  console.log(`Backfill ${from} -> ${to}: ${chunks.length} week chunks, ${pending.length} to fetch`)
+  const mode = `${overwrite ? ', MUFAP rows win in-window' : ''}`
+  console.log(`Backfill ${from} -> ${to}: ${chunks.length} week chunks, ${pending.length} to fetch${mode}`)
 
-  let totalAdded = 0
+  let totalChanged = 0
   for (const [i, chunk] of pending.entries()) {
     const key = `${chunk.from}_${chunk.to}`
     process.stdout.write(`[${i + 1}/${pending.length}] ${key} ... `)
     const html = await fetchChunk(chunk.from, chunk.to)
     const byFund = parseChunk(html, chunk.from, chunk.to)
-    let added = 0
-    for (const [fundId, entries] of byFund) added += await mergeFund(fundId, entries)
-    state[key] = true
-    await saveState(state)
-    totalAdded += added
-    console.log(`${byFund.size} funds, +${added} entries`)
+    let changed = 0
+    for (const [fundId, entries] of byFund) changed += await mergeFund(fundId, entries, overwrite)
+    if (recentDays <= 0) {
+      state[key] = true
+      await saveState(state)
+    }
+    totalChanged += changed
+    console.log(`${byFund.size} funds, ${changed} rows added or updated`)
     await new Promise(r => setTimeout(r, PAUSE_MS + Math.random() * 1500))
   }
-  console.log(`Done. Added ${totalAdded} history entries.`)
+  console.log(`Done. ${totalChanged} history rows added or updated.`)
 }
 
 main().catch(e => {

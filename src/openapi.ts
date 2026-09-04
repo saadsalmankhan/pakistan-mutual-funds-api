@@ -22,7 +22,7 @@ const fund = {
 const historyEntry = {
   type: 'object',
   properties: {
-    date: { type: 'string', description: 'YYYY-MM-DD, Asia/Karachi scrape date' },
+    date: { type: 'string', description: "YYYY-MM-DD — MUFAP's published NAV validity date for backfilled/merged rows; Asia/Karachi scrape date for live same-day appends" },
     nav: { type: 'number' },
     offerPrice: { type: 'number' },
   },

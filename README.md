@@ -49,9 +49,12 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
 - **History** — every successful scrape also appends each fund's NAV to a
   per-fund NDJSON file under `./data/history/`, one entry per day, so an
   instance accumulates a NAV time series from the day it starts running.
-  MUFAP doesn't publish a NAV date on the directory page, so entries are
+  MUFAP doesn't publish a NAV date on the directory page, so live appends are
   keyed by the scrape date in MUFAP's timezone (Asia/Karachi); a re-scrape
   on the same date replaces that day's entry if MUFAP corrected the values.
+  For history keyed by MUFAP's *published* NAV validity dates (correct no
+  matter when your scheduler actually runs), use the backfill instead — see
+  [Backfilling history](#backfilling-history).
 - **Scheduler** (`src/scheduler.ts`) re-scrapes on a configurable interval.
   MUFAP only publishes updated NAVs once per business day, so scraping more
   often than that just makes extra requests against their site for no new
@@ -76,6 +79,7 @@ All via environment variables (see `.env.example`):
 | `SKIP_WEEKENDS` | `true` | Skip scheduled fetches on Sat/Sun — MUFAP doesn't publish new NAVs on weekends |
 | `DATA_FILE` | `./data/funds.json` | Where scraped data is stored on disk |
 | `HISTORY_DIR` | `./data/history` | Where per-fund NAV history (NDJSON) accumulates |
+| `SKIP_HISTORY` | `false` | `true` stops `npm run scrape` writing history rows — for setups that merge dated history via the backfill instead |
 | `META_FILE` | `./data/meta.json` | Where `npm run enrich` stores expense ratios and inception dates |
 | `SCRAPE_ATTEMPTS` | `4` | How many times to retry the MUFAP fetch past an occasional Cloudflare challenge |
 | `SCRAPE_TIMEOUT_MS` | `45000` | Per-request timeout for the MUFAP fetch, in milliseconds |
@@ -94,6 +98,27 @@ Two ways to keep the data fresh, pick whichever fits your setup:
    serverless/ephemeral where a long-running `setInterval` doesn't make
    sense — trigger the scrape externally, the API just serves whatever's
    on disk.
+
+## Backfilling history
+
+MUFAP's daily-stats table (`Industry/IndustryStatDaily`) publishes every NAV
+*with its validity date*, at full 4-decimal precision — unlike the directory
+page the live scraper reads. `npm run backfill` merges it into the same
+per-fund NDJSON files:
+
+```bash
+npm run backfill                              # seed history from 2022-01-01
+npm run backfill -- --from=2019-01-01         # go deeper
+npm run backfill -- --recent=10 --overwrite   # re-merge the trailing 10 days
+```
+
+Existing rows win on conflict, except with `--overwrite`, which lets fresh
+MUFAP rows replace same-date entries inside the fetched window. Running
+`--recent=N --overwrite` after each scrape keeps history keyed by MUFAP's own
+dates — immune to scheduler delay (a run that starts after midnight PKT can't
+mis-date rows) — and picks up MUFAP's occasional corrections. That's exactly
+what the [dataset repo](https://github.com/saadsalmankhan/pakistan-mutual-funds-data)'s
+daily workflow does, paired with `SKIP_HISTORY=true` on the snapshot scrape.
 
 ## API reference
 
@@ -194,8 +219,9 @@ curl "http://localhost:4000/api/funds/12768/history?from=2026-08-01"
 ```
 
 History accumulates from the day an instance first runs (one entry per
-business day). Dates are scrape dates in Asia/Karachi — MUFAP doesn't expose
-an official NAV date on the directory page.
+business day). Rows merged by `npm run backfill` carry MUFAP's published NAV
+validity dates; rows appended live by the scraper are keyed by the Asia/Karachi
+scrape date, since MUFAP doesn't expose a NAV date on the directory page.
 
 ### `GET /api/funds/:id/returns`
 
