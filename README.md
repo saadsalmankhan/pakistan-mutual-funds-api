@@ -37,13 +37,17 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
 
 - **Scraper** (`src/scraper.ts`) fetches and parses MUFAP's Fund Directory
   page with [cheerio](https://cheerio.js.org/).
-- **Cloudflare handling** — MUFAP sits behind Cloudflare's bot protection, so
-  a plain request gets a `403`. The scraper uses
-  [got-scraping](https://github.com/apify/got-scraping) to fetch the page with
-  a real browser's TLS fingerprint, which Cloudflare serves the real page to.
-  This is automatic: no clearance cookies, no headless browser and no config,
-  so a fresh clone works out of the box. Cloudflare still challenges the odd
-  request, so the fetch retries a few times before giving up.
+- **Cloudflare handling** (`src/mufap.ts`) — MUFAP sits behind Cloudflare's
+  bot protection, so a plain request gets a `403`. Every MUFAP fetch goes
+  through [got-scraping](https://github.com/apify/got-scraping), which sends
+  the page request with a real browser's TLS fingerprint and header order.
+  The fingerprint is pinned to Firefox and Safari: Cloudflare waves those
+  through almost every time, while Chrome fingerprints (got-scraping's
+  default) get challenged about half the time from a home connection and
+  nearly always from a datacenter IP such as a GitHub Actions runner. This is
+  automatic: no clearance cookies, no headless browser and no config, so a
+  fresh clone works out of the box. The fetch still retries a few times past
+  the odd challenge before giving up.
 - **Storage** (`src/store.ts`) writes the result to a local JSON file
   (`./data/funds.json` by default) — no database required.
 - **History** — every successful scrape also appends each fund's NAV to a
@@ -81,8 +85,8 @@ All via environment variables (see `.env.example`):
 | `HISTORY_DIR` | `./data/history` | Where per-fund NAV history (NDJSON) accumulates |
 | `SKIP_HISTORY` | `false` | `true` stops `npm run scrape` writing history rows — for setups that merge dated history via the backfill instead |
 | `META_FILE` | `./data/meta.json` | Where `npm run enrich` stores expense ratios and inception dates |
-| `SCRAPE_ATTEMPTS` | `4` | How many times to retry the MUFAP fetch past an occasional Cloudflare challenge |
-| `SCRAPE_TIMEOUT_MS` | `45000` | Per-request timeout for the MUFAP fetch, in milliseconds |
+| `SCRAPE_ATTEMPTS` | `5` | How many times to retry a MUFAP fetch past an occasional Cloudflare challenge |
+| `SCRAPE_TIMEOUT_MS` | `60000` | Per-request timeout for MUFAP fetches, in milliseconds |
 
 ## Running it your way
 

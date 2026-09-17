@@ -6,47 +6,21 @@
 // rarely, so running this daily is fine but not required.
 import 'dotenv/config'
 import * as cheerio from 'cheerio'
-import { gotScraping } from 'got-scraping'
 import { writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { fetchMufapHtml } from './mufap.js'
 import type { MetaFile } from './types.js'
 
 const EXPENSE_RATIOS_URL = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=5'
 const META_FILE = process.env.META_FILE || './data/meta.json'
-const MAX_ATTEMPTS = Math.max(1, Number(process.env.SCRAPE_ATTEMPTS) || 4)
-const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.SCRAPE_TIMEOUT_MS) || 45000)
 
 function parsePercent(text: string): number | undefined {
   const n = parseFloat(text.replace(/,/g, '').trim())
   return isNaN(n) ? undefined : n
 }
 
-async function fetchExpenseRatiosHtml(): Promise<string> {
-  let lastError: unknown
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    if (attempt > 1) await new Promise(r => setTimeout(r, attempt * 5000))
-    try {
-      const res = await gotScraping({
-        url: EXPENSE_RATIOS_URL,
-        timeout: { request: REQUEST_TIMEOUT_MS },
-        retry: { limit: 0 },
-      })
-      if (res.statusCode === 200 && res.body.includes('fund-block')) {
-        return res.body
-      }
-      lastError = new Error(
-        `MUFAP returned HTTP ${res.statusCode} without fund data (likely a Cloudflare challenge)`
-      )
-    } catch (err) {
-      lastError = err
-    }
-  }
-  const detail = lastError instanceof Error ? lastError.message : String(lastError)
-  throw new Error(`MUFAP expense ratios fetch failed after ${MAX_ATTEMPTS} attempts: ${detail}`)
-}
-
 export async function scrapeFundMeta(): Promise<MetaFile> {
-  const html = await fetchExpenseRatiosHtml()
+  const html = await fetchMufapHtml(EXPENSE_RATIOS_URL, 'expense ratios')
   const $ = cheerio.load(html)
 
   // Columns: Sector | AMC | Fund | Category | Inception Date | NAV |

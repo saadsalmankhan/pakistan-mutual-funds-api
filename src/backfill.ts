@@ -20,15 +20,13 @@
 // its whole point is re-fetching the same window every day.
 import 'dotenv/config'
 import * as cheerio from 'cheerio'
-import { gotScraping } from 'got-scraping'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { fetchMufapHtml } from './mufap.js'
 import { historyFile, historyDir, karachiDate } from './store.js'
 import type { HistoryEntry } from './types.js'
 
 const STATE_FILE = process.env.BACKFILL_STATE_FILE || './data/backfill-state.json'
-const MAX_ATTEMPTS = Math.max(1, Number(process.env.SCRAPE_ATTEMPTS) || 5)
-const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.SCRAPE_TIMEOUT_MS) || 60000)
 const PAUSE_MS = 3000
 
 const MONTHS: Record<string, string> = {
@@ -74,18 +72,7 @@ async function fetchChunk(from: string, to: string): Promise<string> {
   const url =
     'https://www.mufap.com.pk/Industry/IndustryStatDaily' +
     `?tab=3&AMCId=0&fundId=0&datefrom=${from}&datetill=${to}`
-  let lastError: unknown
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    if (attempt > 1) await new Promise(r => setTimeout(r, attempt * 5000))
-    try {
-      const res = await gotScraping({ url, timeout: { request: REQUEST_TIMEOUT_MS }, retry: { limit: 0 } })
-      if (res.statusCode === 200 && res.body.includes('fund-block')) return res.body
-      lastError = new Error(`HTTP ${res.statusCode} without fund data`)
-    } catch (err) {
-      lastError = err
-    }
-  }
-  throw new Error(`chunk ${from}..${to} failed after ${MAX_ATTEMPTS} attempts: ${lastError instanceof Error ? lastError.message : lastError}`)
+  return fetchMufapHtml(url, `chunk ${from}..${to}`)
 }
 
 // Cell layout (tab=3): [0] Sector (hidden) [1] AMC (hidden) [2] Fund
