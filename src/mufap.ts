@@ -49,13 +49,20 @@ export async function fetchMufapHtml(url: string, what: string): Promise<string>
         retry: { limit: 0 },
         headerGeneratorOptions: HEADER_GENERATOR_OPTIONS,
       })
+      // Log which impersonated browser each attempt used, so run logs show
+      // what Cloudflare is and isn't letting through from a given network.
+      const ua = String(res.request.options.headers['user-agent'] ?? '')
+      const family = /Firefox/.test(ua) ? 'firefox' : /Safari/.test(ua) ? 'safari' : 'other'
       if (res.statusCode === 200 && res.body.includes('fund-block')) {
+        console.log(`  fetched ${what} on attempt ${attempt}/${MAX_ATTEMPTS} as ${family}`)
         return res.body
       }
+      console.log(`  ${what}: attempt ${attempt}/${MAX_ATTEMPTS} as ${family} got HTTP ${res.statusCode} without fund data`)
       lastError = new MufapFetchError(
         `MUFAP returned HTTP ${res.statusCode} without fund data (likely a Cloudflare challenge)`
       )
     } catch (err) {
+      console.log(`  ${what}: attempt ${attempt}/${MAX_ATTEMPTS} threw ${err instanceof Error ? err.message : err}`)
       lastError = err
     }
   }
