@@ -8,22 +8,30 @@
 // which Cloudflare mostly waves through — no headless browser, no clearance
 // cookies, no configuration.
 //
-// Which browser it impersonates matters a lot, though. Measured Sep 2026 from
-// a residential IP, 10 requests each: Firefox 10/10, Safari 10/10, Chrome 6/10,
-// Chrome over HTTP/1.1 3/10 (identical headers pass and fail, so it's most
-// likely the TLS fingerprint Cloudflare scores — Node can't reproduce Chrome's
-// BoringSSL handshake, but it gets close enough to Firefox's and Safari's).
-// got-scraping's default header generator leans Chrome, which is why the
-// GitHub Actions dataset job (datacenter IPs, scored harsher still) went from
-// flaky to failing every attempt. So the generator is pinned to the two
-// families that pass, desktop only.
+// Which browser it impersonates matters a lot, though. Measured Sep 2026
+// against the Fund Directory:
+//
+//   network                     chrome   firefox   safari
+//   residential (PTCL, PK)       6/10     10/10    10/10
+//   GitHub runners (AS8075) *    0/32     14/32     0/32
+//
+//   * ubuntu-latest, ubuntu-24.04-arm, macos-latest and windows-latest all
+//     egress from Microsoft IP space and all scored the same.
+//
+// Identical headers pass and fail, so it's most likely the TLS fingerprint
+// Cloudflare scores: Node can't reproduce Chrome's BoringSSL handshake, and
+// from a datacenter IP only the Firefox impersonation survives. got-scraping's
+// default header generator leans Chrome, which is why the GitHub Actions
+// dataset job went from flaky to failing every attempt. So the generator is
+// pinned to Firefox, desktop only. (Safari also passes from a home
+// connection, but pinning both would halve the runners' odds per attempt.)
 import { gotScraping } from 'got-scraping'
 
 const MAX_ATTEMPTS = Math.max(1, Number(process.env.SCRAPE_ATTEMPTS) || 5)
 const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.SCRAPE_TIMEOUT_MS) || 60000)
 
 const HEADER_GENERATOR_OPTIONS = {
-  browsers: ['firefox', 'safari'],
+  browsers: ['firefox'],
   devices: ['desktop'],
   operatingSystems: ['macos', 'windows'],
   locales: ['en-US'],

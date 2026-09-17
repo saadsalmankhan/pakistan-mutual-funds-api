@@ -41,10 +41,11 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
   bot protection, so a plain request gets a `403`. Every MUFAP fetch goes
   through [got-scraping](https://github.com/apify/got-scraping), which sends
   the page request with a real browser's TLS fingerprint and header order.
-  The fingerprint is pinned to Firefox and Safari: Cloudflare waves those
-  through almost every time, while Chrome fingerprints (got-scraping's
-  default) get challenged about half the time from a home connection and
-  nearly always from a datacenter IP such as a GitHub Actions runner. This is
+  The fingerprint is pinned to Firefox: Cloudflare waves that through almost
+  every time from a home connection and about half the time from a
+  datacenter IP such as a GitHub Actions runner, while Chrome (got-scraping's
+  default) and Safari fingerprints get challenged far more often, and from a
+  datacenter IP every single time. This is
   automatic: no clearance cookies, no headless browser and no config, so a
   fresh clone works out of the box. The fetch still retries a few times past
   the odd challenge before giving up.
