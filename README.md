@@ -296,4 +296,9 @@ public dataset by default, or set `API_BASE_URL` to use your own instance.
 claude mcp add pakistan-mutual-funds -- npx -y pakistan-mutual-funds-mcp
 ```
 
+There is also a hosted connector for claude.ai and ChatGPT, nothing to
+install: add `https://funds.saadsalman.org/mcp` as a custom connector. Setup
+steps are at [funds.saadsalman.org](https://funds.saadsalman.org) and in the
+[`mcp/` README](mcp/README.md).
+
 An OpenAPI 3.1 spec for the REST API is served at `GET /openapi.json`.

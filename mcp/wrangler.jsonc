@@ -1,0 +1,15 @@
+// Cloudflare Worker that hosts the MCP server over Streamable HTTP.
+//   npm run dev      local workerd at http://localhost:8787/mcp
+//   npm run deploy   publish (needs `npx wrangler login` once)
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pakistan-mutual-funds-mcp",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Custom domain: Cloudflare creates the DNS record and certificate itself,
+  // as long as the saadsalman.org zone is on the account you deploy from.
+  // Forking this? Delete "routes" and you get a free *.workers.dev URL.
+  "routes": [{ "pattern": "funds.saadsalman.org", "custom_domain": true }]
+}

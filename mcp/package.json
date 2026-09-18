@@ -1,7 +1,7 @@
 {
   "name": "pakistan-mutual-funds-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for Pakistani mutual fund NAVs, history, and returns — zero-setup, reads the free public MUFAP-sourced dataset.",
+  "version": "0.2.0",
+  "description": "MCP server for Pakistani mutual fund NAVs, history, and returns — zero-setup, reads the free public MUFAP-sourced dataset. Runs locally over stdio or hosted on Cloudflare Workers.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -9,8 +9,15 @@
   },
   "files": [
     "index.js",
+    "server.js",
     "README.md"
   ],
+  "scripts": {
+    "test": "node test-client.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test:remote": "node test-remote.mjs"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -30,7 +37,10 @@
     "directory": "mcp"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
   }
 }

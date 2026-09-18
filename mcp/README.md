@@ -8,6 +8,13 @@ Zero setup: by default it reads the free public
 [pakistan-mutual-funds-data](https://github.com/saadsalmankhan/pakistan-mutual-funds-data)
 dataset. No API key, no server to run.
 
+There are two ways to use it:
+
+- **Hosted connector** for claude.ai, the Claude apps and ChatGPT. Nothing to install, you paste one URL:
+  `https://funds.saadsalman.org/mcp`
+- **Local server** for Claude Code, Claude Desktop and any other client that launches stdio servers:
+  `npx -y pakistan-mutual-funds-mcp`
+
 ## What you can ask
 
 - What is the latest NAV for [fund name]?
@@ -15,7 +22,37 @@ dataset. No API key, no server to run.
 - List all money market funds, or all Shariah compliant funds.
 - Which AMCs have an income fund, and how do their returns compare?
 
-## Requirements
+## Hosted connector (Claude and ChatGPT)
+
+The connector URL is `https://funds.saadsalman.org/mcp`. It needs no login. Open
+[funds.saadsalman.org](https://funds.saadsalman.org) for the same steps on one page.
+
+**Claude** (web, desktop and mobile, every plan; the free plan allows one custom connector)
+
+1. Open Customize, then Connectors. Click + and choose Add custom connector.
+2. Name it Pakistan Mutual Funds, paste the URL and click Add. Skip the advanced settings.
+3. In a chat, click + at the lower left, open Connectors and switch it on.
+
+**Claude Code**
+
+```bash
+claude mcp add --transport http pakistan-mutual-funds https://funds.saadsalman.org/mcp
+```
+
+**ChatGPT** (web; Plus, Pro, Business, Enterprise or Education)
+
+1. Open Settings, then Security and login and turn on Developer mode.
+2. Go to Plugins, click the plus button and create an app for a remote MCP server. Paste the URL and
+   pick No Authentication.
+3. In a new chat, choose Developer mode from the plus menu and select the app.
+
+Both apps move these menus around. If the steps look off, check
+[Claude's guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+or [OpenAI's developer mode guide](https://developers.openai.com/api/docs/guides/developer-mode).
+
+The hosted connector also exposes `search` and `fetch`, the pair ChatGPT requires for deep research.
+
+## Local server: requirements
 
 Node.js 18 or newer (that gives you `npx`). Check with `node -v`. Sanity-check the server with
 `npx -y pakistan-mutual-funds-mcp`, it should start and wait quietly (Ctrl+C to exit).
@@ -49,13 +86,6 @@ Add the server to your config, then fully quit and reopen the app:
 
 The same block works in any other MCP client that launches stdio servers.
 
-## Use with ChatGPT
-
-This server runs locally over stdio, and ChatGPT's custom connectors only load remote MCP servers
-reachable at a public URL, so it cannot launch the local `npx` command the way Claude does. To use
-it in ChatGPT you would first host it as a remote (HTTP transport) endpoint, then add that URL under
-Settings, Connectors, Developer mode. Until a hosted URL exists, use Claude above.
-
 ## Tools
 
 | Tool | What it does |
@@ -65,6 +95,7 @@ Settings, Connectors, Developer mode. Until a hosted URL exists, use Claude abov
 | `get_nav_history` | Daily NAV series with optional date bounds and weekly/monthly thinning |
 | `get_returns` | Trailing 1m/3m/YTD/1y + sinceTracking returns (simple NAV change, not annualized) |
 | `get_filters` | All distinct categories and AMC names |
+| `search`, `fetch` | Hosted connector only: free-text fund search and a full fund report, in the shape ChatGPT deep research expects |
 
 ## Self-hosted mode
 
@@ -86,9 +117,10 @@ instance? Point the server at it:
 ## Data notes
 
 - NAVs are scraped from MUFAP's public pages once per business day; history
-  dates are Asia/Karachi scrape dates.
+  dates are MUFAP's own NAV validity dates.
 - Returns are simple NAV percentage change: not annualized, payouts and
-  dividends not accounted for.
+  dividends not accounted for. A payout drops the NAV, so a sharp negative
+  return on a money market or income fund usually marks a payout, not a loss.
 - Informational use only, not financial advice. Verify against MUFAP before
   making decisions. Not affiliated with MUFAP.
 
@@ -99,5 +131,21 @@ instance? Point the server at it:
   and check the JSON is valid, a stray comma breaks it.
 - **First call is slow** the first `npx` run fetches the package, quick after that.
 - **Nothing returns for a fund** try a shorter name substring, matching is loose.
+
+## Host your own connector
+
+The hosted connector is [`worker.js`](worker.js), a stateless Cloudflare Worker that serves the same
+server over Streamable HTTP. It fits the free Workers plan. From a clone of this directory:
+
+```bash
+npm install
+npm run dev                  # http://localhost:8787/mcp
+npm run test:remote          # smoke test every tool against the local Worker
+npx wrangler login           # once
+npm run deploy
+```
+
+Delete the `routes` entry in [`wrangler.jsonc`](wrangler.jsonc) first and you get a free `*.workers.dev` URL,
+or point it at a hostname on your own Cloudflare zone.
 
 Built by [Saad Salman](https://saadsalman.org). MIT.
