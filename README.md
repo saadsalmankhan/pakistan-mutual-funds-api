@@ -72,6 +72,16 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
   per-fund TER, management fee and inception date in `data/meta.json`;
   every subsequent snapshot merges it in by `fundId`. Expense ratios change
   rarely, so running it daily is fine but weekly is plenty.
+- **Payouts** (`src/payouts.ts`, `npm run payouts`) scrapes MUFAP's Payouts
+  table into per-fund NDJSON: payout per unit, ex-NAV and date. This is what
+  turns NAV change into a total return, see
+  [Total returns and beating the market](#total-returns-and-beating-the-market).
+- **Indices** (`src/indices.ts`, `npm run indices`) pulls KSE-100 and KMI-30
+  end-of-day closes from the PSX Data Portal, the benchmarks funds are held
+  against.
+- **Performance** (`src/performance.ts`, `npm run performance`) builds the
+  league table behind `/api/performance` and can write it to a single
+  `performance.json` for static hosting.
 
 ## Configuration
 
@@ -86,6 +96,9 @@ All via environment variables (see `.env.example`):
 | `HISTORY_DIR` | `./data/history` | Where per-fund NAV history (NDJSON) accumulates |
 | `SKIP_HISTORY` | `false` | `true` stops `npm run scrape` writing history rows — for setups that merge dated history via the backfill instead |
 | `META_FILE` | `./data/meta.json` | Where `npm run enrich` stores expense ratios and inception dates |
+| `PAYOUTS_DIR` | `./data/payouts` | Where per-fund payout history (NDJSON) accumulates |
+| `INDEX_DIR` | `./data/indices` | Where benchmark index history (NDJSON) accumulates |
+| `PERFORMANCE_FILE` | `./data/performance.json` | Where `npm run performance` writes the league table |
 | `SCRAPE_ATTEMPTS` | `5` | How many times to retry a MUFAP fetch past an occasional Cloudflare challenge |
 | `SCRAPE_TIMEOUT_MS` | `60000` | Per-request timeout for MUFAP fetches, in milliseconds |
 
@@ -124,6 +137,67 @@ dates — immune to scheduler delay (a run that starts after midnight PKT can't
 mis-date rows) — and picks up MUFAP's occasional corrections. That's exactly
 what the [dataset repo](https://github.com/saadsalmankhan/pakistan-mutual-funds-data)'s
 daily workflow does, paired with `SKIP_HISTORY=true` on the snapshot scrape.
+
+## Total returns and beating the market
+
+Asset managers charge around 3 to 4% a year to run an equity fund. The
+question worth asking of that fee is whether the fund beat the index you
+could have bought instead. Answering it takes three things the fund
+directory does not give you, so the API collects them:
+
+```bash
+npm run payouts                 # every payout since 2022-01-01
+npm run payouts -- --recent=45  # re-merge the trailing days (daily job)
+npm run indices                 # KSE-100 and KMI-30 closes from PSX
+npm run performance             # write data/performance.json (optional)
+```
+
+The built-in scheduler refreshes payouts and indices after every scrape. If
+you run your own cron, add the two `--recent` style commands to it.
+
+**Why payouts matter.** A payout drops the NAV by the amount paid without
+the investor losing anything. Faysal Islamic Stock Fund's NAV went from
+99.29 to 115.37 over the three years to 18 Sep 2026, which reads as +16%.
+It also paid 65.76 and 43.80 per unit along the way. Reinvest those at the
+ex-NAV and the real return is +189.9%. MUFAP's own figure is +189.41%.
+
+**Method.** Total return = NAV growth multiplied by `1 + payout / exNAV` for
+every payout in the window. Returns are net of fees because fees come out of
+the NAV, cumulative, never annualized. The benchmark is measured over the
+exact same two dates: KSE-100 for conventional equity categories and KMI-30
+for Shariah ones. Both are total-return indices (PSX publishes the
+price-only variant separately as KSE100PR), so the comparison is like for
+like. `excessPct` is fund minus index in percentage points.
+
+**Validation.** `npm run validate` checks these returns against MUFAP's own
+payout-adjusted Performance Summary. In Sep 2026, across every fund MUFAP
+reports on an absolute basis: 1 year and 2 year figures within 1 percentage
+point for all 140 and 125 funds compared, 3 year within 1 point for 93% of
+116 and within 5 for 99%. The NAV-only method this replaces was off by a
+median of 33 points over 3 years.
+
+**Dirty source data, and what is done about it.** MUFAP's tables are typed in
+by about 25 asset managers:
+
+- One-day bad values (a pension scheme's equity and debt NAVs transposed for
+  a day) are dropped, so a period boundary can't land on one.
+- Payout dates that trail the NAV drop by a day or three are re-dated to the
+  day the NAV actually fell, and a dividend listed twice is counted once.
+  One fund's official 3 year figure differs from this API's for that reason:
+  MUFAP counts Alfalah GHP Dedicated Equity Fund's June 2024 dividend twice.
+- A one-day NAV level shift above 35% with no payout behind it (a 10-for-1
+  unit consolidation reads as +900%) is **not** rewritten, because a small
+  fund can really gain that much on a provision reversal and the numbers
+  can't tell the two apart. The period is computed at face value, flagged
+  with `anomalies`, and left out of league tables unless you pass
+  `includeFlagged=true`.
+
+**Read the league table with these in mind.** Closed and merged funds vanish
+from MUFAP's directory, so the share of funds beating the index is flattered
+(survivorship bias). An index can't be bought at zero cost. Index trackers
+and ETFs are built to match the index, so they are listed separately
+(`style=passive`). And three years to Sep 2026 was one long bull market, in
+which any cash a fund holds drags on it.
 
 ## API reference
 
@@ -230,29 +304,79 @@ scrape date, since MUFAP doesn't expose a NAV date on the directory page.
 
 ### `GET /api/funds/:id/returns`
 
-Trailing returns computed from the fund's accumulated history:
+Trailing total returns next to the fund's benchmark:
 
 ```json
 {
-  "fundId": "12768",
-  "latestDate": "2026-08-30",
-  "latestNav": 10.44,
+  "fundId": "12896",
+  "latestDate": "2026-09-18",
+  "latestNav": 115.367,
+  "benchmark": "KMI-30",
   "returns": {
-    "1m": { "pct": 2.68, "fromDate": "2026-07-30", "fromNav": 10.17 },
-    "3m": null,
-    "ytd": null,
-    "1y": null,
-    "sinceTracking": { "pct": 4.92, "fromDate": "2026-08-30", "fromNav": 9.95 }
+    "1y": { "pct": -2.35, "navPct": -2.35, "fromDate": "2025-09-18", "fromNav": 118.1468,
+            "payouts": 0, "anomalies": 0, "benchmarkPct": 4.49, "excessPct": -6.84 },
+    "3y": { "pct": 189.89, "navPct": 16.19, "fromDate": "2023-09-18", "fromNav": 99.2878,
+            "payouts": 2, "anomalies": 0, "benchmarkPct": 213.71, "excessPct": -23.82 }
   }
 }
 ```
 
-The formula is deliberately boring: simple NAV percentage change against the
-most recent NAV on or before each period boundary, rounded to two decimals.
-Not annualized, and payouts/dividends are not accounted for (this is NAV-only
-data), so income-distributing funds will understate. A period is `null` until
-the tracked history reaches back far enough — `sinceTracking` is always
-available once a fund has two days of history.
+Periods: `1m`, `3m`, `6m`, `ytd`, `fytd` (Pakistani fiscal year to date, from
+June 30), `1y`, `2y`, `3y` and `sinceTracking`. `pct` is the total return
+with payouts reinvested, `navPct` the NAV-only change. `benchmarkPct` and
+`excessPct` are `null` for funds without a benchmark. A period is `null`
+until tracked history reaches back far enough. See
+[Total returns and beating the market](#total-returns-and-beating-the-market)
+for the method.
+
+> Before v1.3 `pct` was the NAV-only change. It is now the total return,
+> which is the number almost everyone wanted. The old value lives on as
+> `navPct`.
+
+### `GET /api/funds/:id/payouts`
+
+Payout history, oldest first: `{ "fundId", "payouts": [{ "date", "payout", "exNav" }] }`.
+Takes `from` and `to` like `/history`. Empty for a fund that never paid out.
+
+### `GET /api/performance`
+
+Who beat the market after fees. Funds ranked by return in excess of their
+benchmark, best first. `GET /api/performance?period=3y&category=Equity`:
+
+```json
+{
+  "period": "3y",
+  "asOf": "2026-09-18",
+  "benchmarks": { "KSE-100": 273.08, "KMI-30": 213.71 },
+  "summary": { "funds": 25, "beatBenchmark": 7, "beatBenchmarkPct": 28,
+               "medianPct": 238.98, "medianExcessPct": -34.1, "avgExpenseRatio": 3.78 },
+  "funds": [
+    { "fundId": "13081", "name": "NBP Financial Sector Fund", "amc": "NBP Fund Management Limited",
+      "category": "Equity", "benchmark": "KSE-100", "passive": false, "expenseRatio": 3.24,
+      "pct": 408.84, "navPct": 146.56, "benchmarkPct": 269.46, "excessPct": 139.38,
+      "beatBenchmark": true, "anomalies": 0, "fromDate": "2023-09-15", "asOf": "2026-09-17" }
+  ]
+}
+```
+
+| Param | Meaning |
+|---|---|
+| `period` | One of the periods above, default `1y` |
+| `category`, `amc`, `q`, `shariah` | Same filters as `/api/funds` |
+| `style` | `active` (default), `passive` (index trackers and ETFs) or `all` |
+| `benchmark` | `KSE-100` or `KMI-30`: hold every selected fund against this index instead of its own. Without it only funds that have a benchmark are listed |
+| `sort`, `order`, `limit` | `sort=return` ranks by return instead of excess, `order=asc` puts the worst first |
+| `includeStale`, `includeFlagged` | Include funds that stopped reporting, or whose window holds a NAV anomaly |
+
+`GET /api/performance/amcs` takes the same filters and rolls the table up per
+asset manager: funds counted, how many beat their benchmark, average excess
+return, average expense ratio, best and worst fund.
+
+### `GET /api/benchmarks` and `GET /api/benchmarks/:name/history`
+
+The indices' latest close and their own trailing returns, and the daily
+closes (`from`/`to` supported). Names ignore case and punctuation, so
+`kse100` works.
 
 ### `GET /api/categories` and `GET /api/amcs`
 
@@ -288,8 +412,8 @@ MIT
 ## MCP server (for AI agents)
 
 The [`mcp/`](mcp/) package exposes this data to any MCP client — Claude,
-Cursor, or your own agents — as five tools (`list_funds`, `get_fund`,
-`get_nav_history`, `get_returns`, `get_filters`). Zero setup: it reads the
+Cursor, or your own agents — as six tools (`list_funds`, `get_fund`,
+`get_nav_history`, `get_returns`, `get_performance`, `get_filters`). Zero setup: it reads the
 public dataset by default, or set `API_BASE_URL` to use your own instance.
 
 ```bash

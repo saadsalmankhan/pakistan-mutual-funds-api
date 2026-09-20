@@ -25,14 +25,23 @@ function isShariah(category: string): boolean {
 // Benchmark mapping for equity-bearing categories only: conventional equity
 // tracks KSE-100, Shariah equity tracks KMI-30. Mixed-mandate categories
 // (Balanced, Asset Allocation) and fixed-income/money-market funds get null —
-// no single index honestly describes them.
+// no single index honestly describes them. "Exchange Traded Fund" is a
+// wrapper, not an asset class: a treasury or gold ETF is no equity fund.
 const EQUITY_CATEGORIES = new Set([
   'Equity', 'Dedicated Equity', 'Index Tracker', 'Exchange Traded Fund', 'VPS-Equity',
 ])
-function inferBenchmark(category: string, shariah: boolean): string | null {
-  const base = category.replace('Shariah Compliant ', '').replace('VPS-Shariah Compliant ', 'VPS-')
+const NON_EQUITY_NAME = /treasury|t-bill|income|money market|cash|sukuk|bond|gold|commodit/i
+export function inferBenchmark(category: string, shariah: boolean, name = ''): string | null {
+  const base = category.replace('VPS-Shariah Compliant ', 'VPS-').replace('Shariah Compliant ', '')
   if (!EQUITY_CATEGORIES.has(base)) return null
+  if (base === 'Exchange Traded Fund' && NON_EQUITY_NAME.test(name)) return null
   return shariah ? 'KMI-30' : 'KSE-100'
+}
+
+// Index trackers and ETFs are built to match an index, not beat it, so
+// "did it beat the market" is the wrong question to put to them.
+export function isPassive(category: string): boolean {
+  return /Index Tracker|Exchange Traded Fund/.test(category)
 }
 
 export async function scrapeMufapFundDirectory(): Promise<Fund[]> {
@@ -56,7 +65,7 @@ export async function scrapeMufapFundDirectory(): Promise<Fund[]> {
 
     if (nav > 0) {
       const shariah = isShariah(category)
-      const benchmark = inferBenchmark(category, shariah)
+      const benchmark = inferBenchmark(category, shariah, name)
       funds.push({ fundId, name, amc, nav, offerPrice, category, shariah, benchmark })
     }
   })

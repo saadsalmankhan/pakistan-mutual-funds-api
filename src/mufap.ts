@@ -77,3 +77,15 @@ export async function fetchMufapHtml(url: string, what: string): Promise<string>
   const detail = lastError instanceof Error ? lastError.message : String(lastError)
   throw new MufapFetchError(`MUFAP ${what} fetch failed after ${MAX_ATTEMPTS} attempts: ${detail}`)
 }
+
+const MONTHS: Record<string, string> = {
+  Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+  Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
+}
+
+// "Aug 24, 2026" -> "2026-08-24" (manual parse: no timezone surprises)
+export function parseMufapDate(text: string): string | null {
+  const m = /^([A-Z][a-z]{2})\s+(\d{1,2}),\s+(\d{4})$/.exec(text.trim())
+  if (!m || !MONTHS[m[1]]) return null
+  return `${m[3]}-${MONTHS[m[1]]}-${m[2].padStart(2, '0')}`
+}

@@ -18,7 +18,9 @@ There are two ways to use it:
 ## What you can ask
 
 - What is the latest NAV for [fund name]?
-- Show me the 1 year return on [fund].
+- Show me the 1 year return on [fund], and did it beat the KSE-100?
+- Which equity funds beat the market over 3 years after fees?
+- Which asset managers earn their fees, and which don't?
 - List all money market funds, or all Shariah compliant funds.
 - Which AMCs have an income fund, and how do their returns compare?
 
@@ -93,7 +95,8 @@ The same block works in any other MCP client that launches stdio servers.
 | `list_funds` | List/filter funds by category, AMC, name substring, Shariah compliance |
 | `get_fund` | Full record for one fund: NAV, offer price, benchmark, expense ratio, inception |
 | `get_nav_history` | Daily NAV series with optional date bounds and weekly/monthly thinning |
-| `get_returns` | Trailing 1m/3m/YTD/1y + sinceTracking returns (simple NAV change, not annualized) |
+| `get_returns` | Trailing total returns (1m to 3y, payouts reinvested) next to the fund's benchmark index and the gap between them |
+| `get_performance` | Who beat the market after fees: funds (or asset managers) ranked by return in excess of KSE-100 / KMI-30, with a summary of how many beat it |
 | `get_filters` | All distinct categories and AMC names |
 | `search`, `fetch` | Hosted connector only: free-text fund search and a full fund report, in the shape ChatGPT deep research expects |
 
@@ -114,13 +117,21 @@ instance? Point the server at it:
 }
 ```
 
+Hosting a fork or mirror of the dataset instead? Set `DATASET_BASE_URL` to its
+raw file base URL.
+
 ## Data notes
 
 - NAVs are scraped from MUFAP's public pages once per business day; history
   dates are MUFAP's own NAV validity dates.
-- Returns are simple NAV percentage change: not annualized, payouts and
-  dividends not accounted for. A payout drops the NAV, so a sharp negative
-  return on a money market or income fund usually marks a payout, not a loss.
+- Returns are total returns: NAV change with every payout reinvested at the
+  ex-NAV, net of fund fees, cumulative and not annualized. They match MUFAP's
+  own payout-adjusted figures within 1 percentage point at 1 and 2 years for
+  every equity fund checked.
+- Benchmarks are KSE-100 (conventional equity) and KMI-30 (Shariah equity),
+  both total-return indices, measured over the same dates as the fund.
+- League tables leave out funds that closed or merged (they vanish from
+  MUFAP), which flatters the share of funds beating the index.
 - Informational use only, not financial advice. Verify against MUFAP before
   making decisions. Not affiliated with MUFAP.
 

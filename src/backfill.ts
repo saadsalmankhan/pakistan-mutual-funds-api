@@ -22,24 +22,12 @@ import 'dotenv/config'
 import * as cheerio from 'cheerio'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { fetchMufapHtml } from './mufap.js'
+import { fetchMufapHtml, parseMufapDate } from './mufap.js'
 import { historyFile, historyDir, karachiDate } from './store.js'
 import type { HistoryEntry } from './types.js'
 
 const STATE_FILE = process.env.BACKFILL_STATE_FILE || './data/backfill-state.json'
 const PAUSE_MS = 3000
-
-const MONTHS: Record<string, string> = {
-  Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
-  Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
-}
-
-// "Aug 24, 2026" -> "2026-08-24" (manual parse: no timezone surprises)
-function parseMufapDate(text: string): string | null {
-  const m = /^([A-Z][a-z]{2})\s+(\d{1,2}),\s+(\d{4})$/.exec(text.trim())
-  if (!m || !MONTHS[m[1]]) return null
-  return `${m[3]}-${MONTHS[m[1]]}-${m[2].padStart(2, '0')}`
-}
 
 function parseNumber(text: string): number {
   const n = parseFloat(text.replace(/,/g, '').trim())

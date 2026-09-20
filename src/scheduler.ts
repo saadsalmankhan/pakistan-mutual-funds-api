@@ -1,5 +1,7 @@
 import { scrapeMufapFundDirectory } from './scraper.js'
 import { writeStore } from './store.js'
+import { recentPayoutsFrom, refreshPayouts } from './payouts.js'
+import { refreshIndices } from './indices.js'
 
 const FETCH_TIMES_PER_DAY = Number(process.env.FETCH_TIMES_PER_DAY || 1)
 // MUFAP publishes NAVs once per business day — they don't change intraday,
@@ -25,6 +27,20 @@ async function fetchAndStore(): Promise<void> {
     console.log(`[scheduler] Stored ${funds.length} funds`)
   } catch (err) {
     console.error('[scheduler] Fetch failed:', err)
+  }
+  // Total returns and the benchmark comparison need recent payouts and index
+  // closes. Each is independent of the snapshot and non-fatal: a miss just
+  // means /returns and /api/performance lag until the next run. The trailing
+  // window re-merges, so a missed day heals itself.
+  try {
+    await refreshPayouts(recentPayoutsFrom(45))
+  } catch (err) {
+    console.error('[scheduler] Payout refresh failed:', err)
+  }
+  try {
+    await refreshIndices()
+  } catch (err) {
+    console.error('[scheduler] Index refresh failed:', err)
   }
 }
 

@@ -122,7 +122,7 @@ function landingPage(endpoint) {
   <ol>
     <li>Open <strong>Customize</strong>, then <strong>Connectors</strong>. Click <strong>+</strong> and choose <strong>Add custom connector</strong>.</li>
     <li>Name it <em>Pakistan Mutual Funds</em>, paste the URL above and click <strong>Add</strong>. Skip the advanced settings, there is no login.</li>
-    <li>In a chat, click <strong>+</strong> at the lower left, open <strong>Connectors</strong> and switch it on. Then ask something like "compare the 1 year return of the biggest Islamic money market funds".</li>
+    <li>In a chat, click <strong>+</strong> at the lower left, open <strong>Connectors</strong> and switch it on. Then ask something like "which equity funds beat the KSE-100 over 3 years after fees?".</li>
   </ol>
   <p>This works on every plan. The free plan allows one custom connector. <a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp">Claude's own guide</a> covers it in more detail.</p>
   <p>Using Claude Code instead? Run <code>claude mcp add --transport http pakistan-mutual-funds ${endpoint}</code></p>
@@ -139,14 +139,15 @@ function landingPage(endpoint) {
   <div class="scroll"><table>
     <tr><td><code>list_funds</code></td><td>Filter funds by name, category, AMC or Shariah status, with current NAVs</td></tr>
     <tr><td><code>get_fund</code></td><td>One fund in full: NAV, offer price, benchmark, expense ratio, management fee, inception</td></tr>
-    <tr><td><code>get_returns</code></td><td>1 month, 3 month, year to date, 1 year and since-tracking returns</td></tr>
+    <tr><td><code>get_performance</code></td><td>Who beat the market after fees: funds or asset managers ranked against the KSE-100 and KMI-30</td></tr>
+    <tr><td><code>get_returns</code></td><td>Total returns from 1 month to 3 years with payouts reinvested, next to the fund's benchmark</td></tr>
     <tr><td><code>get_nav_history</code></td><td>Daily, weekly or monthly NAV series back to 2022</td></tr>
     <tr><td><code>get_filters</code></td><td>Every category and AMC name</td></tr>
     <tr><td><code>search</code>, <code>fetch</code></td><td>The pair ChatGPT uses for deep research</td></tr>
   </table></div>
 
   <h2>Good to know</h2>
-  <p>Returns are simple NAV change. They are not annualized and they leave out dividend payouts, so funds that pay out regularly look flatter than they really are. Expense ratios are fiscal year to date and reset every July 1. This is data, not investment advice.</p>
+  <p>Returns are total returns: NAV change with every payout reinvested, net of fund fees, cumulative and not annualized. They match MUFAP's own figures within 1 percentage point at 1 and 2 years. League tables leave out funds that closed or merged, which flatters the share that beat the index. Expense ratios are fiscal year to date and reset every July 1. This is data, not investment advice.</p>
 
   <footer>
     Built by <a href="https://saadsalman.org">Saad Salman</a>. Read <a href="https://saadsalman.org/blog/free-api-pakistani-mutual-fund-navs">how it works</a>, grab the <a href="https://github.com/saadsalmankhan/pakistan-mutual-funds-data">open dataset</a> or run the <a href="https://github.com/saadsalmankhan/pakistan-mutual-funds-api">API and MCP server</a> yourself. Version ${VERSION}.

@@ -29,6 +29,16 @@ console.log('get_nav_history(12768, monthly):', hist.points, 'points, first', hi
 const ret = parse(await client.callTool({ name: 'get_returns', arguments: { fundId: '12768' } }))
 console.log('get_returns(12768):', JSON.stringify(Object.fromEntries(Object.entries(ret.returns).map(([k, v]) => [k, v?.pct ?? null]))))
 
+const threeY = ret.returns['3y']
+if (threeY && !('navPct' in threeY && 'benchmarkPct' in threeY)) throw new Error('get_returns is missing total-return fields')
+
+const perf = parse(await client.callTool({ name: 'get_performance', arguments: { period: '3y', category: 'Equity', limit: 3 } }))
+if (!perf.summary?.funds || !perf.funds?.length) throw new Error('get_performance returned no league table')
+console.log(`get_performance(3y, Equity): ${perf.summary.beatBenchmark} of ${perf.summary.funds} beat KSE-100 (${perf.benchmarks['KSE-100']}%), best: ${perf.funds[0].name} ${perf.funds[0].excessPct > 0 ? '+' : ''}${perf.funds[0].excessPct}pp`)
+
+const amcs = parse(await client.callTool({ name: 'get_performance', arguments: { period: '3y', groupBy: 'amc', limit: 2 } }))
+console.log('get_performance(3y, by AMC):', amcs.amcs.map(a => `${a.amc} ${a.avgExcessPct}pp`).join(' | '))
+
 const filters = parse(await client.callTool({ name: 'get_filters', arguments: {} }))
 console.log('get_filters:', filters.categories.length, 'categories,', filters.amcs.length, 'AMCs')
 
