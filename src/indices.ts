@@ -12,7 +12,6 @@
 // The portal serves a rolling window of about five years, so merging into the
 // file on every run is what lets the stored history outgrow that window.
 import 'dotenv/config'
-import { gotScraping } from 'got-scraping'
 import { indexFile, mergeDated } from './store.js'
 import type { IndexEntry } from './types.js'
 
@@ -23,22 +22,26 @@ const MAX_ATTEMPTS = Math.max(1, Number(process.env.SCRAPE_ATTEMPTS) || 5)
 
 // Rows are [unixSeconds, close, volume, open?]. PSX stamps the close at
 // 16:00 PKT (11:00 UTC), so the UTC calendar date is the Karachi trading date.
+//
+// Plain fetch on purpose. Unlike MUFAP, the portal has no bot wall, and
+// got-scraping's browser-impersonating TLS handshake is what breaks here:
+// from GitHub's runners PSX hung up on every impersonated request ("socket
+// hang up") while answering plain curl in two seconds.
 async function fetchIndex(symbol: string): Promise<IndexEntry[]> {
   let lastError: unknown
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     if (attempt > 1) await new Promise(r => setTimeout(r, attempt * 3000))
     try {
-      const res = await gotScraping({
-        url: `https://dps.psx.com.pk/timeseries/eod/${symbol}`,
-        responseType: 'json',
-        timeout: { request: 30000 },
-        retry: { limit: 0 },
-        headerGeneratorOptions: { browsers: ['firefox'], devices: ['desktop'] },
+      const res = await fetch(`https://dps.psx.com.pk/timeseries/eod/${symbol}`, {
+        headers: { accept: 'application/json', 'user-agent': 'pakistan-mutual-funds-api (+https://github.com/saadsalmankhan/pakistan-mutual-funds-api)' },
+        signal: AbortSignal.timeout(30000),
       })
-      const body = res.body as { status?: number; data?: unknown }
-      if (res.statusCode === 200 && Array.isArray(body?.data) && body.data.length) {
+      const body = (res.ok ? await res.json() : null) as { status?: number; data?: unknown } | null
+      if (Array.isArray(body?.data) && body.data.length) {
         const entries: IndexEntry[] = []
-        for (const row of body.data as unknown[][]) {
+        // Oldest first, so if PSX ever lists a date twice the later stamp wins.
+        const rows = [...(body.data as unknown[][])].sort((a, b) => Number(a[0]) - Number(b[0]))
+        for (const row of rows) {
           const ts = Number(row[0])
           const close = Number(row[1])
           if (!ts || !(close > 0)) continue
@@ -46,7 +49,7 @@ async function fetchIndex(symbol: string): Promise<IndexEntry[]> {
         }
         if (entries.length) return entries
       }
-      lastError = new Error(`PSX returned HTTP ${res.statusCode} without index data`)
+      lastError = new Error(`PSX returned HTTP ${res.status} without index data`)
     } catch (err) {
       lastError = err
     }
