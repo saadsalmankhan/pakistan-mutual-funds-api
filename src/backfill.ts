@@ -41,7 +41,7 @@ function isoShift(date: string, days: number): string {
 }
 
 // Monday-to-Friday chunks covering [from, to]
-function weekChunks(from: string, to: string): Array<{ from: string; to: string }> {
+export function weekChunks(from: string, to: string): Array<{ from: string; to: string }> {
   const chunks: Array<{ from: string; to: string }> = []
   let d = new Date(from + 'T00:00:00Z')
   const dow = d.getUTCDay()
@@ -50,7 +50,10 @@ function weekChunks(from: string, to: string): Array<{ from: string; to: string 
   while (d <= end) {
     const mon = d.toISOString().slice(0, 10)
     const fri = isoShift(mon, 4)
-    chunks.push({ from: mon < from ? from : mon, to: fri > to ? to : fri })
+    const chunk = { from: mon < from ? from : mon, to: fri > to ? to : fri }
+    // A range starting on a weekend would otherwise yield an empty
+    // Saturday-to-Friday chunk — one more request to get blocked on.
+    if (chunk.from <= chunk.to) chunks.push(chunk)
     d.setUTCDate(d.getUTCDate() + 7)
   }
   return chunks
@@ -177,7 +180,10 @@ async function main() {
   console.log(`Done. ${totalChanged} history rows added or updated.`)
 }
 
-main().catch(e => {
-  console.error('ERROR:', e.message)
-  process.exit(1)
-})
+// Only run when invoked as a script (weekChunks is exported for tests).
+if (process.argv[1] && /backfill\.(ts|js)$/.test(process.argv[1])) {
+  main().catch(e => {
+    console.error('ERROR:', e.message)
+    process.exit(1)
+  })
+}
