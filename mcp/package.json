@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "pakistan-mutual-funds-mcp": "./index.js"
+    "pakistan-mutual-funds-mcp": "index.js"
   },
   "files": [
     "index.js",
