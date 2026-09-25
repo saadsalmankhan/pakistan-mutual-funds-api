@@ -91,8 +91,9 @@ function landingPage(endpoint) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pakistan Mutual Funds MCP connector</title>
+<title>MUFAP API &amp; MCP connector: Pakistan mutual fund NAVs</title>
 <meta name="description" content="Free MCP connector for Claude and ChatGPT: daily NAVs, NAV history and returns for ~550 Pakistani mutual funds, sourced from MUFAP.">
+<link rel="canonical" href="https://saadsalman.org/projects/pakistan-mutual-funds">
 <style>
   :root { --bg:#f7f3ec; --ink:#2b2622; --muted:#6f655c; --clay:#b5573a; --card:#fffdf9; --line:#e6ddd0; }
   @media (prefers-color-scheme: dark) { :root { --bg:#1d1a17; --ink:#efe8de; --muted:#a79c90; --clay:#e08a6b; --card:#26221e; --line:#3a342e; } }
@@ -150,7 +151,7 @@ function landingPage(endpoint) {
   <p>Returns are total returns: NAV change with every payout reinvested, net of fund fees, cumulative and not annualized. They match MUFAP's own figures within 1 percentage point at 1 and 2 years. League tables leave out funds that closed or merged, which flatters the share that beat the index. Expense ratios are fiscal year to date and reset every July 1. This is data, not investment advice.</p>
 
   <footer>
-    Built by <a href="https://saadsalman.org">Saad Salman</a>. Read <a href="https://saadsalman.org/blog/free-api-pakistani-mutual-fund-navs">how it works</a>, grab the <a href="https://github.com/saadsalmankhan/pakistan-mutual-funds-data">open dataset</a> or run the <a href="https://github.com/saadsalmankhan/pakistan-mutual-funds-api">API and MCP server</a> yourself. Version ${VERSION}.
+    Built by <a href="https://saadsalman.org">Saad Salman</a>. Full docs live on the <a href="https://saadsalman.org/projects/pakistan-mutual-funds">project page</a>, with <a href="https://saadsalman.org/blog/free-api-pakistani-mutual-fund-navs">how it works</a> on the blog. Grab the <a href="https://github.com/saadsalmankhan/pakistan-mutual-funds-data">open dataset</a> or run the <a href="https://github.com/saadsalmankhan/pakistan-mutual-funds-api">API and MCP server</a> yourself. Version ${VERSION}.
   </footer>
 </main>
 </body>

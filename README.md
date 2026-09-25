@@ -4,6 +4,11 @@ A small self-hosted scraper + REST API for Pakistani mutual fund NAVs (net
 asset values), sourced from [MUFAP's](https://www.mufap.com.pk/) public Fund
 Directory. Run it yourself, point your frontend at it, done.
 
+> **Docs, the hosted connector and one-line setup:**
+> [saadsalman.org/projects/pakistan-mutual-funds](https://saadsalman.org/projects/pakistan-mutual-funds)
+> Nothing to install if you just want the data inside Claude or ChatGPT: add
+> `https://funds.saadsalman.org/mcp` as a custom connector.
+
 Don't want to run anything? This scraper also feeds
 [pakistan-mutual-funds-data](https://github.com/saadsalmankhan/pakistan-mutual-funds-data),
 a free public dataset where a GitHub Action commits the daily snapshot,
