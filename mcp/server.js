@@ -369,6 +369,10 @@ export function createServer({ apiBase, datasetBase, chatgptTools = false, fetch
     annotations: READ_ONLY,
   }, async ({ period = '1y', category, amc, shariah, style = 'active', benchmark, groupBy = 'fund', order = 'best', limit = 15 }) => {
     let rows, asOf, benchmarks
+    // Data problems the dataset itself reports (e.g. a benchmark that stopped
+    // updating). Passed through so an empty or thin table never reads as a
+    // real answer.
+    let warnings = []
     if (API) {
       const qs = new URLSearchParams({ period, style })
       if (category) qs.set('category', category)
@@ -377,11 +381,13 @@ export function createServer({ apiBase, datasetBase, chatgptTools = false, fetch
       if (benchmark) qs.set('benchmark', benchmark)
       const data = await fetchJson(`${API}/api/performance?${qs}`)
       ;({ funds: rows, asOf, benchmarks } = data)
+      warnings = data.warnings ?? []
     } else {
       const perf = await getPerformance()
       if (!perf) return text({ error: 'This dataset mirror has no performance.json yet.' })
       const override = benchmark ? await getIndex(benchmark) : null
       asOf = perf.asOf
+      warnings = perf.warnings ?? []
       benchmarks = Object.fromEntries(Object.entries(perf.benchmarks).map(([name, b]) => [name, b.returns[period]]))
       rows = []
       for (const f of perf.funds) {
@@ -404,6 +410,7 @@ export function createServer({ apiBase, datasetBase, chatgptTools = false, fetch
       rows.sort((a, b) => b.excessPct - a.excessPct)
     }
     const summary = summarize(rows)
+    const extra = warnings.length ? { warnings } : {}
     if (groupBy === 'amc') {
       const byAmc = new Map()
       for (const r of rows) byAmc.set(r.amc, [...(byAmc.get(r.amc) ?? []), r])
@@ -413,12 +420,12 @@ export function createServer({ apiBase, datasetBase, chatgptTools = false, fetch
         worst: `${list.at(-1).name} (${list.at(-1).excessPct > 0 ? '+' : ''}${list.at(-1).excessPct})`,
       })).sort((a, b) => b.avgExcessPct - a.avgExcessPct)
       if (order === 'worst') amcs.reverse()
-      return text({ period, asOf, benchmarks, summary, amcs: amcs.slice(0, limit), note: LEAGUE_NOTE })
+      return text({ period, asOf, benchmarks, summary, ...extra, amcs: amcs.slice(0, limit), note: LEAGUE_NOTE })
     }
     const ranked = order === 'worst' ? [...rows].reverse() : rows
     const slim = ({ fundId, name, amc, category, benchmark, expenseRatio, pct, benchmarkPct, excessPct }) =>
       ({ fundId, name, amc, category, benchmark, expenseRatio, pct, benchmarkPct, excessPct })
-    return text({ period, asOf, benchmarks, summary, returned: Math.min(limit, ranked.length), funds: ranked.slice(0, limit).map(slim), note: LEAGUE_NOTE })
+    return text({ period, asOf, benchmarks, summary, ...extra, returned: Math.min(limit, ranked.length), funds: ranked.slice(0, limit).map(slim), note: LEAGUE_NOTE })
   })
 
   server.registerTool('get_filters', {

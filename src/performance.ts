@@ -50,6 +50,7 @@ export interface PerformanceFile {
   generatedAt: string
   asOf: string // newest NAV date across all funds
   note: string
+  warnings: string[] // data problems a reader of the table needs to know about
   benchmarks: Record<string, { asOf: string; close: number; returns: Record<Period, number | null> }>
   funds: PerformanceRow[]
 }
@@ -121,7 +122,22 @@ export async function buildPerformance(store: FundStore): Promise<PerformanceFil
     for (const p of PERIODS) returns[p] = pseudo.returns[p]?.navPct ?? null
     indexReturns[name] = { asOf: pseudo.latestDate, close: pseudo.latestNav, returns }
   }
-  return { generatedAt: new Date().toISOString(), asOf, note: PERFORMANCE_NOTE, benchmarks: indexReturns, funds: rows }
+  // A benchmark that has fallen behind the fund data can't be compared
+  // against (returns.ts refuses stale closes), and every league table comes
+  // back empty. Say so in the file rather than letting "0 of 0 funds" pass
+  // for an answer: that went unnoticed for a month in Oct 2026.
+  const warnings: string[] = []
+  for (const name of Object.keys(INDICES)) {
+    const b = indexReturns[name]
+    if (!b) warnings.push(`No ${name} history on file: benchmark comparisons are unavailable.`)
+    else if (daysBetween(b.asOf, asOf) > STALE_DAYS) {
+      warnings.push(
+        `${name} history ends ${b.asOf}, ${daysBetween(b.asOf, asOf)} days before the fund data (${asOf}): ` +
+        'comparisons against it are unavailable until it is refreshed.'
+      )
+    }
+  }
+  return { generatedAt: new Date().toISOString(), asOf, note: PERFORMANCE_NOTE, warnings, benchmarks: indexReturns, funds: rows }
 }
 
 export interface LeagueQuery {

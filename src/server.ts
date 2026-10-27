@@ -241,6 +241,7 @@ export function createServer() {
         asOf: perf.asOf,
         benchmarks: Object.fromEntries(Object.entries(perf.benchmarks).map(([name, b]) => [name, b.returns[period]])),
         summary: summarize(rows),
+        ...(perf.warnings?.length ? { warnings: perf.warnings } : {}),
         funds: sorted.slice(0, limit),
         note: PERFORMANCE_NOTE,
       })
@@ -255,7 +256,11 @@ export function createServer() {
       const league = await leagueFromRequest(req, res)
       if (!league) return
       const { period, perf, rows } = league
-      res.json({ period, asOf: perf.asOf, summary: summarize(rows), amcs: amcTable(rows), note: PERFORMANCE_NOTE })
+      res.json({
+        period, asOf: perf.asOf, summary: summarize(rows),
+        ...(perf.warnings?.length ? { warnings: perf.warnings } : {}),
+        amcs: amcTable(rows), note: PERFORMANCE_NOTE,
+      })
     } catch (err) {
       console.error('Failed to serve AMC performance:', err)
       res.status(500).json({ error: 'Failed to compute performance' })

@@ -38,6 +38,9 @@ export interface Payout {
 export interface IndexEntry {
   date: string // YYYY-MM-DD
   close: number
+  // Which sources agreed on this close (see indices.ts). Absent on rows from
+  // before Oct 2026, which PSX's own timeseries endpoint served.
+  sources?: string[]
 }
 
 export interface FundMeta {

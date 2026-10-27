@@ -119,6 +119,11 @@ export function indexFile(name: string): string {
   return join(INDEX_DIR, `${safeName(name.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}.ndjson`)
 }
 
+// What each index source said on the last refresh (see indices.ts).
+export function indexStatusFile(): string {
+  return join(INDEX_DIR, 'sources.json')
+}
+
 async function readNdjson<T>(file: string): Promise<T[] | null> {
   let raw: string
   try {
