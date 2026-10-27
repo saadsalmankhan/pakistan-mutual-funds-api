@@ -15,7 +15,8 @@
     "payouts": "tsx src/payouts.ts",
     "indices": "tsx src/indices.ts",
     "performance": "tsx src/performance.ts",
-    "validate": "tsx src/validate.ts"
+    "validate": "tsx src/validate.ts",
+    "healthcheck": "tsx src/healthcheck.ts"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
