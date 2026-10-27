@@ -25,6 +25,13 @@
 const INTERNAL_UA = /healthcheck/i
 const INTERNAL_CLIENTS = new Set(['smoke-test', 'remote-smoke-test', 'health-check'])
 
+// Version negotiation, not failures. claude.ai first tries server/discover
+// with a protocol version newer than the SDK speaks; the 400 it gets back
+// makes it fall back to initialize, which then succeeds. Recorded as
+// 'unsupported' so these probes don't show up as errors.
+const NEGOTIATION_METHODS = new Set(['server/discover'])
+const NOT_ERRORS = "status NOT IN ('ok', 'unsupported')"
+
 // The JSON-RPC messages in a request body (a single message or a batch).
 export async function readMessages(request) {
   try {
@@ -69,9 +76,10 @@ export async function recordRequest({ env, request, response, messages, startedA
   const outcomes = response ? await readOutcomes(response) : new Map()
   const rows = (messages.length ? messages : [{ method: '(unparsed)' }]).map(m => {
     const clientInfo = m.method === 'initialize' ? m.params?.clientInfo : undefined
-    const status = error ? 'exception'
+    let status = error ? 'exception'
       : response && response.status >= 400 ? 'http_error'
       : outcomes.get(m.id) ?? 'ok'
+    if (NEGOTIATION_METHODS.has(m.method) && (status === 'http_error' || status === 'rpc_error')) status = 'unsupported'
     return {
       method: m.method,
       tool: m.method === 'tools/call' ? String(m.params?.name ?? '') : null,
@@ -116,17 +124,17 @@ export async function usageStats(db, days) {
       COUNT(*) AS requests,
       SUM(method = 'initialize') AS connections,
       SUM(method = 'tools/call') AS toolCalls,
-      SUM(status != 'ok') AS errors,
+      SUM(${NOT_ERRORS}) AS errors,
       COUNT(DISTINCT client_key) AS distinctCallers
     ${base}`)
   const byDay = await q(`SELECT day,
       COUNT(*) AS requests,
       SUM(method = 'initialize') AS connections,
       SUM(method = 'tools/call') AS toolCalls,
-      SUM(status != 'ok') AS errors,
+      SUM(${NOT_ERRORS}) AS errors,
       COUNT(DISTINCT client_key) AS distinctCallers
     ${base} GROUP BY day ORDER BY day`)
-  const byTool = await q(`SELECT tool, COUNT(*) AS calls, SUM(status != 'ok') AS errors
+  const byTool = await q(`SELECT tool, COUNT(*) AS calls, SUM(${NOT_ERRORS}) AS errors
     ${base} AND method = 'tools/call' GROUP BY tool ORDER BY calls DESC`)
   const byClient = await q(`SELECT COALESCE(client, '(unknown)') AS client, COUNT(*) AS connections, COUNT(DISTINCT client_key) AS distinctCallers
     ${base} AND method = 'initialize' GROUP BY client ORDER BY connections DESC LIMIT 20`)
@@ -135,7 +143,7 @@ export async function usageStats(db, days) {
   const byUserAgent = await q(`SELECT ua, COUNT(*) AS requests
     ${base} GROUP BY ua ORDER BY requests DESC LIMIT 10`)
   const errors = await q(`SELECT day, method, tool, status, COUNT(*) AS n
-    ${base} AND status != 'ok' GROUP BY day, method, tool, status ORDER BY day DESC LIMIT 20`)
+    ${base} AND ${NOT_ERRORS} GROUP BY day, method, tool, status ORDER BY day DESC LIMIT 20`)
   const latencies = (await q(`SELECT ms ${base} AND method = 'tools/call' AND ms IS NOT NULL ORDER BY ms LIMIT 20000`)).map(r => r.ms)
 
   return {
