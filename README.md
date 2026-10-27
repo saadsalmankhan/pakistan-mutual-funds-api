@@ -81,9 +81,10 @@ once immediately on startup, and serves whatever it has at `GET /api/funds`.
   table into per-fund NDJSON: payout per unit, ex-NAV and date. This is what
   turns NAV change into a total return, see
   [Total returns and beating the market](#total-returns-and-beating-the-market).
-- **Indices** (`src/indices.ts`, `npm run indices`) pulls KSE-100 and KMI-30
-  end-of-day closes from the PSX Data Portal, the benchmarks funds are held
-  against.
+- **Indices** (`src/indices.ts`, `npm run indices`) collects KSE-100 and
+  KMI-30 end-of-day closes, the benchmarks funds are held against, from three
+  sources that check each other. See
+  [Where index closes come from](#where-index-closes-come-from).
 - **Performance** (`src/performance.ts`, `npm run performance`) builds the
   league table behind `/api/performance` and can write it to a single
   `performance.json` for static hosting.
@@ -153,12 +154,33 @@ directory does not give you, so the API collects them:
 ```bash
 npm run payouts                 # every payout since 2022-01-01
 npm run payouts -- --recent=45  # re-merge the trailing days (daily job)
-npm run indices                 # KSE-100 and KMI-30 closes from PSX
+npm run indices                 # KSE-100 and KMI-30 closes, cross-checked
 npm run performance             # write data/performance.json (optional)
 ```
 
 The built-in scheduler refreshes payouts and indices after every scrape. If
 you run your own cron, add the two `--recent` style commands to it.
+
+### Where index closes come from
+
+PSX sells its historical data feed to vendors (that's where Investing.com and
+similar sites get theirs) and has no free API. The PSX Data Portal endpoint
+this project used until Sep 2026 was closed to outside callers without
+notice, so index closes now come from three independent sources on every run:
+
+| Source | Gives | Role |
+|---|---|---|
+| [scstrade.com](https://scstrade.com/MarketStatistics/MS_HistoricalIndices.aspx) | Dated closes for any range | The only free history; fills gaps. Matched PSX's own figures to the paisa on all 179 overlapping days of 2026 |
+| [PSX indices page](https://dps.psx.com.pk/indices) | Latest close with its date | Official number, preferred when sources agree |
+| TradingView screener | Latest value, undated | Confirms the session PSX names; never creates a row on its own |
+
+Each date is settled by the sources that cover it. Two that agree within
+0.05% win, a lone source is accepted and recorded as such, and sources that
+disagree write nothing for that day. A stored close is never replaced
+unless two sources agree on the new number. Every row records which
+sources confirmed it (`"sources": ["psx","tradingview"]`), and
+`indices/sources.json` records what each source said on the last run. Any
+one source can be down without leaving a gap.
 
 **Why payouts matter.** A payout drops the NAV by the amount paid without
 the investor losing anything. Faysal Islamic Stock Fund's NAV went from
@@ -203,6 +225,23 @@ from MUFAP's directory, so the share of funds beating the index is flattered
 and ETFs are built to match the index, so they are listed separately
 (`style=passive`). And three years to Sep 2026 was one long bull market, in
 which any cash a fund holds drags on it.
+
+## Monitoring
+
+`npm run healthcheck` checks what users actually get, reading the published
+dataset and calling the hosted MCP connector over HTTP:
+
+- the snapshot and the newest NAV are no more than a business day or so old,
+  and almost every fund has a current NAV;
+- both benchmark indices are current, and the league table isn't empty;
+- every index source answered on the last run, with no disagreements;
+- the connector is up and actually ranks funds.
+
+Each check comes out ok, warn or fail, and the script exits 1 on any fail.
+The dataset repo runs it every 3 hours and turns failures into a GitHub
+issue that emails the owner, comments only when what's broken changes, and
+closes itself on recovery. Point `DATASET_BASE_URL` and `CONNECTOR_URL` at
+your own deployment to monitor a fork.
 
 ## API reference
 
