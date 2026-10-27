@@ -8,6 +8,15 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // Usage analytics (usage.js). Table definition in schema.sql; apply with
+  // `npm run db:migrate`. Secrets, set with `wrangler secret put`:
+  //   STATS_KEY  unlocks GET /stats (the weekly report reads it)
+  //   HASH_SALT  salts the caller hash, so it can't be reversed to an IP
+  // Forking this? Create your own with `wrangler d1 create`, or delete this
+  // block: without the binding nothing is recorded and requests still log.
+  "d1_databases": [
+    { "binding": "USAGE_DB", "database_name": "funds-mcp-usage", "database_id": "7c7d69dc-cd7b-4d4c-a6e5-74b1716d16cc" }
+  ],
   // Custom domain: Cloudflare creates the DNS record and certificate itself,
   // as long as the saadsalman.org zone is on the account you deploy from.
   // Forking this? Delete "routes" and you get a free *.workers.dev URL.

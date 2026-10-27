@@ -51,7 +51,10 @@ async function readOutcomes(response) {
   return outcomes
 }
 
+// Without the secret salt the hash could be brute-forced back to an IPv4
+// address, so no salt means no key at all rather than a weak one.
 async function clientKey(request, salt) {
+  if (!salt) return null
   const ip = request.headers.get('cf-connecting-ip') ?? ''
   const ua = request.headers.get('user-agent') ?? ''
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}|${ip}|${ua}`))
@@ -87,7 +90,7 @@ export async function recordRequest({ env, request, response, messages, startedA
 
   if (!env?.USAGE_DB) return
   try {
-    const key = await clientKey(request, env.HASH_SALT ?? 'unsalted')
+    const key = await clientKey(request, env.HASH_SALT)
     const now = Date.now()
     const day = new Date(now).toISOString().slice(0, 10)
     const insert = env.USAGE_DB.prepare(
