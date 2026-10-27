@@ -7,7 +7,10 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 const endpoint = process.argv[2] ?? 'http://localhost:8787/mcp'
 const client = new Client({ name: 'remote-smoke-test', version: '0.0.1' })
-await client.connect(new StreamableHTTPClientTransport(new URL(endpoint)))
+// Tagged so the connector's usage analytics count this as our own traffic.
+await client.connect(new StreamableHTTPClientTransport(new URL(endpoint), {
+  requestInit: { headers: { 'user-agent': 'pakistan-mutual-funds-healthcheck (smoke test)' } },
+}))
 console.log('connected to', endpoint, '|', JSON.stringify(client.getServerVersion()))
 
 const { tools } = await client.listTools()

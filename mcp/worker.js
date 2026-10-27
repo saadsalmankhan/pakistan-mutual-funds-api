@@ -7,6 +7,7 @@
 //                 paste the bare origin)
 //   GET  /        human-readable setup page
 //   GET  /health  liveness + version
+//   GET  /stats   usage aggregates (needs the STATS_KEY secret, see usage.js)
 //
 // Deliberately stateless: every request gets a fresh server and transport,
 // answers with plain JSON (no SSE stream, no session id), and nothing is kept
@@ -15,6 +16,7 @@
 // data is public and read-only.
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { createServer, VERSION } from './server.js'
+import { readMessages, recordRequest, usageStats } from './usage.js'
 
 // Cache dataset files at Cloudflare's edge for a few minutes on top of
 // server.js's in-isolate cache. The dataset changes once a business day.
@@ -37,7 +39,7 @@ function withCors(res) {
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
 
-async function handleMcp(request, ctx) {
+async function handleMcp(request, env, ctx) {
   // Stateless servers have no stream to open (GET) or session to end
   // (DELETE); the spec's answer for both is 405.
   if (request.method !== 'POST') {
@@ -47,27 +49,51 @@ async function handleMcp(request, ctx) {
       { Allow: 'POST, OPTIONS' }
     )
   }
+  const startedAt = Date.now()
+  const messages = await readMessages(request)
   const server = createServer({ chatgptTools: true, fetchInit: FETCH_INIT })
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   })
   await server.connect(transport)
+  let response
+  let error
   try {
-    return await transport.handleRequest(request)
+    response = await transport.handleRequest(request)
+    return response
+  } catch (err) {
+    error = err
+    throw err
   } finally {
     ctx.waitUntil(server.close().catch(() => {}))
+    // After the response: logging and analytics never delay or break a call.
+    ctx.waitUntil(recordRequest({ env, request, response, messages, startedAt, error }).catch(() => {}))
   }
 }
 
+// Usage aggregates for the weekly report. Private: the numbers are the
+// owner's business, so the endpoint wants the STATS_KEY secret and looks
+// like any other unknown path without it.
+async function handleStats(request, env, url) {
+  const given = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? url.searchParams.get('key')
+  if (!env.STATS_KEY || given !== env.STATS_KEY) return json({ error: 'Not found. The MCP endpoint is POST /mcp.' }, 404)
+  if (!env.USAGE_DB) return json({ error: 'No usage database bound' }, 503)
+  const days = Math.min(Math.max(Math.floor(Number(url.searchParams.get('days'))) || 30, 1), 400)
+  return json(await usageStats(env.USAGE_DB, days), 200, { 'Cache-Control': 'no-store' })
+}
+
 export default {
-  async fetch(request, _env, ctx) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
     try {
       if (url.pathname === '/mcp' || (url.pathname === '/' && request.method === 'POST')) {
-        return withCors(await handleMcp(request, ctx))
+        return withCors(await handleMcp(request, env, ctx))
+      }
+      if (url.pathname === '/stats' && request.method === 'GET') {
+        return await handleStats(request, env, url)
       }
       if (url.pathname === '/health') {
         return withCors(json({ ok: true, name: 'pakistan-mutual-funds', version: VERSION }))
@@ -79,7 +105,7 @@ export default {
       }
       return withCors(json({ error: 'Not found. The MCP endpoint is POST /mcp.' }, 404))
     } catch (err) {
-      console.error('unhandled', err)
+      console.error(JSON.stringify({ event: 'unhandled', path: url.pathname, error: String(err?.stack ?? err) }))
       return withCors(json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null }, 500))
     }
   },

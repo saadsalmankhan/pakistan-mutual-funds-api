@@ -16,7 +16,8 @@
     "indices": "tsx src/indices.ts",
     "performance": "tsx src/performance.ts",
     "validate": "tsx src/validate.ts",
-    "healthcheck": "tsx src/healthcheck.ts"
+    "healthcheck": "tsx src/healthcheck.ts",
+    "usage-report": "tsx src/usagereport.ts"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
